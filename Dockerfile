@@ -8,6 +8,7 @@
 FROM python:3.11-slim
 
 ARG TORCH_VERSION=2.8.0
+ARG TORCHVISION_VERSION=0.23.0
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 
 ENV PYTHONUNBUFFERED=1 \
@@ -19,12 +20,15 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# PyTorch first: it is the large layer and changes least often.
+# PyTorch first: it is the large layer and changes least often. torchvision
+# is installed here too (timm depends on it) so that a later step cannot pull
+# a different PyTorch build from PyPI.
 RUN pip install "torch==${TORCH_VERSION}" "torchaudio==${TORCH_VERSION}" \
-        --index-url "${TORCH_INDEX_URL}"
+        "torchvision==${TORCHVISION_VERSION}" --index-url "${TORCH_INDEX_URL}"
 
 COPY requirements.txt ./
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt \
+    && python -c "import torch, torchaudio; assert torch.__version__.startswith('${TORCH_VERSION}'), torch.__version__"
 
 COPY pyproject.toml README.md ./
 COPY rmfdn_ablation ./rmfdn_ablation

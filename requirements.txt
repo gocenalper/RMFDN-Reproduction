@@ -1,9 +1,10 @@
-# Versions the Docker image is built and tested with. PyTorch and torchaudio
-# are installed separately (see Dockerfile) so the CPU or CUDA build can be chosen.
-timm
-transformers
-scikit-learn
-numpy
-opencv-python-headless
-soundfile
-pytest
+# Versions the Docker image is built and tested with. torch, torchaudio and
+# torchvision are installed separately (see Dockerfile) so that the CPU or the
+# CUDA build can be chosen.
+timm==1.0.31
+transformers==5.23.0
+scikit-learn==1.9.1
+numpy==2.4.6
+opencv-python-headless==5.0.0.93
+soundfile==0.14.0
+pytest==9.2.0
