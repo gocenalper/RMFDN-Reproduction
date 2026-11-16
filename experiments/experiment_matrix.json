@@ -1,5 +1,5 @@
 {
-  "description": "Experiment matrix. Axes: protocol p1 (original split) / p2 (identity-disjoint, gender-stratified); cross_modal m1 (original fusion) / m2 (MulG); identity i1 (closed-set reference) / i2 (verification-based, open-set) / i3 (no identity pipeline). Both m1 and m2 are implemented; cells with i2 are recognised but skipped as not_implemented. All runs additionally report per-bit (per-technique) accuracy.",
+  "description": "R-MFDN experiment matrix. Axes: protocol p1 (official IDForge split) / p2 (identity-disjoint); identity i1 (identity reference on) / i3 (reference off). cross_modal is always m1, the R-MFDN progressive cross-attention fusion. A run is named <cross_modal>_<identity>_<protocol>_<modalities>, e.g. m1_i1_p1_VAT.",
   "cells": [
     {
       "cross_modal": "m1",
@@ -36,44 +36,9 @@
       "identity": "i3",
       "protocol": "p2",
       "modalities": [
-        "VAT"
-      ]
-    },
-    {
-      "cross_modal": "m2",
-      "identity": "i1",
-      "protocol": "p2",
-      "modalities": [
-        "VAT"
-      ]
-    },
-    {
-      "cross_modal": "m2",
-      "identity": "i3",
-      "protocol": "p2",
-      "modalities": [
-        "VAT"
-      ]
-    },
-    {
-      "cross_modal": "m1",
-      "identity": "i2",
-      "protocol": "p2",
-      "modalities": [
-        "VAT"
-      ]
-    },
-    {
-      "cross_modal": "m2",
-      "identity": "i2",
-      "protocol": "p2",
-      "modalities": [
         "V",
         "A",
         "T",
-        "VA",
-        "VT",
-        "AT",
         "VAT"
       ]
     }

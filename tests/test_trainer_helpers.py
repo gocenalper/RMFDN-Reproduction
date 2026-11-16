@@ -12,7 +12,6 @@ from unittest import mock
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import RandomSampler
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -127,65 +126,6 @@ def test_build_optimizer_preserves_visual_parameter_groups():
     assert optimizer.defaults["weight_decay"] == 0.01
 
 
-def test_m2_uses_the_shared_encoder_contract_and_optimizer_path():
-    import rmfdn_ablation.mulG_RMFDN as mulg_module
-
-    class TinyBackbone(nn.Linear):
-        num_features = 2
-
-    class TinyBert(nn.Module):
-        config = types.SimpleNamespace(hidden_size=2)
-
-        @classmethod
-        def from_pretrained(cls, _name):
-            return cls()
-
-        def __init__(self):
-            super().__init__()
-
-    fake_timm = types.SimpleNamespace(
-        create_model=lambda *_args, **_kwargs: TinyBackbone(2, 2))
-    fake_transformers = types.SimpleNamespace(BertModel=TinyBert)
-    config = {
-        "embed_dim": 2,
-        "attention_heads": 1,
-        "contrastive_dim": 2,
-        "frame_groups": 1,
-        "frames_per_clip": 1,
-        "n_mels": 16,
-        "mel_frames": 16,
-        "bert_model": "unused",
-        "peak_lr": 5e-5,
-        "weight_decay": 0.01,
-        "backbone_lr_scale": 0.2,
-        "reference_alpha": 0.001,
-    }
-
-    with mock.patch.dict(sys.modules, {"timm": fake_timm,
-                                       "transformers": fake_transformers}), \
-         mock.patch.object(mulg_module, "VisualEncoder", _TinySequenceEncoder,
-                           create=True), \
-         mock.patch.object(mulg_module, "AudioEncoder", _TinySequenceEncoder,
-                           create=True), \
-         mock.patch.object(mulg_module, "TextEncoder", _TinySequenceEncoder,
-                           create=True):
-        model = mulg_module.MulGRmfdn(config, ["v", "a", "t"])
-
-    assert set(model.encoders) == {"v", "a", "t"}
-    optimizer = _build_optimizer(model, ["v", "a", "t"], config)
-    assert len(optimizer.param_groups) == 2
-
-    batch = {
-        "frames": torch.randn(2, 3, 2),
-        "mel": torch.randn(2, 4, 2),
-        "input_ids": torch.ones(2, 5, 2),
-        "attention_mask": torch.ones(2, 5, dtype=torch.long),
-    }
-    outputs = model(batch)
-    assert outputs["binary_logits"].shape == (2, 2)
-    assert outputs["technique_logits"].shape == (2, 7)
-
-
 def test_m1_forwards_every_declared_modality_combination():
     import rmfdn_ablation.RMFDN as rmfdn_module
 
@@ -231,9 +171,8 @@ def test_build_optimizer_uses_one_group_without_visual_modality():
     }
 
 
-def test_build_train_loader_preserves_unbalanced_loader_options():
+def test_build_train_loader_preserves_loader_options():
     config = {
-        "bounded_sampler_pristine": None,
         "batch_size": 2,
         "num_workers": 0,
         "seed": 3,
@@ -337,7 +276,7 @@ def test_validation_run_writes_only_the_canonical_checkpoint():
 
     config = dict(DEFAULT_CONFIG)
     config.update(total_iters=2, eval_interval=1, batch_size=1, num_workers=0,
-                  bounded_sampler_pristine=None)
+                  )
     batch = {
         "frames": torch.zeros(1),
         "mel": torch.zeros(1),
@@ -355,6 +294,7 @@ def test_validation_run_writes_only_the_canonical_checkpoint():
          mock.patch.object(trainer.torch.amp, "autocast",
                            side_effect=lambda *_args, **_kwargs: nullcontext()), \
          mock.patch.object(trainer, "_build_train_loader", return_value=[batch]), \
+         mock.patch.object(trainer, "RMFDN", _TinyRunModel), \
          mock.patch.object(
             trainer, "_compute_training_loss",
             side_effect=lambda outputs, *args, **kwargs: outputs["loss_anchor"] * 0 + 1.0), \
@@ -364,7 +304,7 @@ def test_validation_run_writes_only_the_canonical_checkpoint():
             train_clips=[FakeClip()], val_clips=[FakeClip()],
             test_clips=[], reference_index={},
             tokenizer=None, config=config, output_dir=temp_dir, device="cpu",
-            model_class=_TinyRunModel, skip_test_eval=True)
+            skip_test_eval=True)
         run_dir = Path(temp_dir) / "runs"
 
         assert result["test_eval"] == "skipped"
@@ -534,57 +474,13 @@ def test_visible_bit_mask_per_modality():
     assert _visible_bit_mask(["a"]).tolist() == [0, 0, 1, 1, 0, 0, 0]
     assert _visible_bit_mask(["t"]).tolist() == [0, 0, 0, 0, 0, 1, 0]
     # ...but the shuffle bits splice genuine content, so they need a second
-    # stream to compare against. Measured: audio_shuffle is visible to a+v
-    # (94.3 AP) but NOT to a+t (35.0, below audio-only 46.4) because the
-    # shuffled speech and transcript share a donor; text_shuffle is visible
-    # to a+t (85.7).
+    # stream to compare against: audio_shuffle is visible to a+v but not to
+    # a+t (the shuffled speech and transcript share a donor); text_shuffle is
+    # visible to a+t.
     assert _visible_bit_mask(["v", "a"]).tolist() == [1, 1, 1, 1, 1, 0, 0]
     assert _visible_bit_mask(["a", "t"]).tolist() == [0, 0, 1, 1, 0, 1, 1]
     assert _visible_bit_mask(["v", "t"]).tolist() == [1, 1, 0, 0, 0, 1, 0]
     assert _visible_bit_mask(["v", "a", "t"]).tolist() == [1] * 7
-
-
-def test_softmax_mlc_loss_zeroes_pristine_rows():
-    logits = torch.tensor([[2.0, -1.0, 0.5, 0.0, 0.0, 0.0, 0.0],
-                           [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
-    targets = torch.tensor([[1.0, 0, 1, 0, 0, 0, 0],   # 2-bit fake
-                            [0.0, 0, 0, 0, 0, 0, 0]])  # pristine -> sifir katki
-    outputs = {"binary_logits": torch.zeros(2, 2),
-               "technique_logits": logits}
-    batch = {"is_fake": torch.tensor([1, 0]), "identity": ["id00", "id01"]}
-    zero = lambda *args, **kwargs: torch.tensor(0.0)
-    with mock.patch.object(trainer, "cross_modal_consistency_loss", zero), \
-         mock.patch.object(trainer, "identity_aware_contrastive_loss", zero):
-        loss = _compute_training_loss(outputs, batch, targets, ["v"], 1.0, 0.0, 0.0,
-                                      None, 1, mlc_loss_mode="softmax")
-    expected_mlc = -(targets * F.log_softmax(logits, 1)).sum(1).mean()
-    expected = F.cross_entropy(outputs["binary_logits"], batch["is_fake"]) + expected_mlc
-    assert torch.isclose(loss, expected)
-    # pristine satirinin katkisi gercekten sifir mi: sadece fake satiriyla ayni mlc
-    only_fake = -(targets[:1] * F.log_softmax(logits[:1], 1)).sum(1)
-    assert torch.isclose(expected_mlc * 2, only_fake.sum())
-
-
-def test_softmax_norm_mlc_loss_removes_k_weight():
-    logits = torch.tensor([[2.0, -1.0, 0.5, 0.0, 0.0, 0.0, 0.0],
-                           [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
-    targets = torch.tensor([[1.0, 0, 1, 0, 0, 0, 0],   # K=2 fake
-                            [0.0, 0, 0, 0, 0, 0, 0]])  # pristine -> sifir katki
-    outputs = {"binary_logits": torch.zeros(2, 2),
-               "technique_logits": logits}
-    batch = {"is_fake": torch.tensor([1, 0]), "identity": ["id00", "id01"]}
-    zero = lambda *args, **kwargs: torch.tensor(0.0)
-    with mock.patch.object(trainer, "cross_modal_consistency_loss", zero), \
-         mock.patch.object(trainer, "identity_aware_contrastive_loss", zero):
-        raw = _compute_training_loss(outputs, batch, targets, ["v"], 1.0, 0.0, 0.0,
-                                     None, 1, mlc_loss_mode="softmax")
-        norm = _compute_training_loss(outputs, batch, targets, ["v"], 1.0, 0.0, 0.0,
-                                      None, 1, mlc_loss_mode="softmax_norm")
-    bic = F.cross_entropy(outputs["binary_logits"], batch["is_fake"])
-    # K=2'lik tek fake satirda: raw mlc = 2 * norm mlc (ayni minimizer, K-kat agirlik)
-    assert torch.isclose(raw - bic, 2 * (norm - bic))
-    # pristine satiri normalize edilirken 0/0 uretmemeli (clamp korumasi)
-    assert torch.isfinite(norm)
 
 
 if __name__ == "__main__":
@@ -594,11 +490,3 @@ if __name__ == "__main__":
             print(f"ok  {name}")
     print("all trainer-helper tests passed")
 
-
-def test_probe_bits_widen_the_visible_set():
-    # A probe run asks whether a pair can see a bit the map assigns elsewhere.
-    assert _visible_bit_mask(["v", "t"]).tolist() == [1, 1, 0, 0, 0, 1, 0]
-    assert _visible_bit_mask(["v", "t"], ("text_shuffle", "audio_shuffle")
-                             ).tolist() == [1, 1, 0, 0, 1, 1, 1]
-    # already-visible names are idempotent, not duplicated
-    assert _visible_bit_mask(["v"], ("lip_sync",)).tolist() == [1, 1, 0, 0, 0, 0, 0]

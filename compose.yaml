@@ -1,0 +1,77 @@
+# Usage (identical on Linux, macOS and Windows):
+#
+#   docker compose run --rm test      unit tests
+#   docker compose run --rm smoke     end-to-end run on synthetic clips
+#   docker compose run --rm results   print the results table
+#   docker compose run --rm train     train on IDForge (GPU; see README)
+#
+# Paths for the train/eval services come from the environment or a .env file:
+#   IDFORGE_ROOT       dataset root with train/ val/ test/
+#   IDFORGE_REFERENCE  per-identity pristine reference clips
+#   RMFDN_OUTPUT       where results.json and checkpoints are written
+
+x-base: &base
+  build: .
+  image: rmfdn:cpu
+  volumes:
+    - model-cache:/cache
+
+x-gpu: &gpu
+  build:
+    context: .
+    args:
+      TORCH_INDEX_URL: https://download.pytorch.org/whl/cu126
+  image: rmfdn:gpu
+  shm_size: 8gb
+  volumes:
+    - model-cache:/cache
+    - ${IDFORGE_ROOT:-./data/idforge}:/data/idforge:ro
+    - ${IDFORGE_REFERENCE:-./data/idforge_ref}:/data/idforge_ref:ro
+    - ${RMFDN_OUTPUT:-./suite_out}:/out
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  test:
+    <<: *base
+    command: python -m pytest -q
+
+  smoke:
+    <<: *base
+    command: python scripts/smoke_test.py
+
+  results:
+    <<: *base
+    command: python scripts/summarize_results.py
+
+  train:
+    <<: *gpu
+    command: >
+      python scripts/run_experiment_suite.py
+      --config ${RMFDN_CONFIG:-experiments/experiment_matrix.json}
+      --data-root /data/idforge --reference-root /data/idforge_ref
+      --p2-split ${RMFDN_SPLIT:-protocol_p2/fold_F0.json}
+      --output-dir /out
+      --iters ${RMFDN_ITERS:-6000} --lr-schedule-iters 90000
+      --eval-interval 1500 --patience 8
+      --batch-size 64 --grad-accum-steps 2 --num-workers 8
+      --mask-invisible-bits --skip-test-eval
+
+  eval:
+    <<: *gpu
+    command: >
+      python scripts/run_test_eval.py
+      --phase1-dir /out
+      --data-root /data/idforge --reference-root /data/idforge_ref
+      --p2-split ${RMFDN_SPLIT:-protocol_p2/fold_F0.json}
+      --batch-size 64 --num-workers 4
+      --metric-implementation reference_apmeter --visible-bits-only
+      --output /out/test_results.json
+
+volumes:
+  model-cache:

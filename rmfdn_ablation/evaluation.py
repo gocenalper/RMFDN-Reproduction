@@ -32,7 +32,7 @@ import torch
 from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
 from torch.utils.data import DataLoader
 
-from .config import MANIPULATION_TECHNIQUES, TYPE_TEMPLATES, default_device
+from .config import MANIPULATION_TECHNIQUES, default_device
 from .dataset import MultimodalClipDataset, build_collate_fn
 from .reference import encode_reference_batch
 
@@ -111,9 +111,6 @@ def evaluate(model, dataset: MultimodalClipDataset, tokenizer, config: dict,
         raise ValueError("technique_indices must be unique valid bit indices")
     if metric_implementation not in {"sklearn", "reference_apmeter"}:
         raise ValueError(f"unknown metric implementation: {metric_implementation}")
-    if (metric_implementation == "reference_apmeter"
-            and config.get("mlc_loss", "bce") != "bce"):
-        raise ValueError("reference_apmeter evaluation is defined for BCE logits")
     model.eval()
     loader = DataLoader(dataset, batch_size=config["batch_size"], shuffle=False,
                         num_workers=config["num_workers"],
@@ -138,20 +135,9 @@ def evaluate(model, dataset: MultimodalClipDataset, tokenizer, config: dict,
             outputs = model(batch, reference_fused=reference_features)
 
         fake_scores.append(
-            torch.softmax(outputs["binary_logits"].float(), 1)[:, 1].cpu().numpy()
-            if "binary_logits" in outputs
-            else np.zeros(len(batch["is_fake"]), dtype=np.float32))
+            torch.softmax(outputs["binary_logits"].float(), 1)[:, 1].cpu().numpy())
         fake_labels.append(batch["is_fake"].numpy())
-        mlc_mode = config.get("mlc_loss", "bce")
-        if mlc_mode == "type11":  # 11-class type-softmax -> marginalise to 7-bit
-            _tpl = torch.tensor(TYPE_TEMPLATES, dtype=torch.float32,
-                                device=outputs["technique_logits"].device)
-            _type_probs = torch.softmax(outputs["technique_logits"].float(), 1)
-            technique_scores.append((_type_probs @ _tpl).cpu().numpy())
-        elif mlc_mode.startswith("softmax"):  # softmax-trained 7-bit head
-            technique_scores.append(
-                torch.softmax(outputs["technique_logits"].float(), 1).cpu().numpy())
-        elif metric_implementation == "reference_apmeter":
+        if metric_implementation == "reference_apmeter":
             technique_scores.append(
                 outputs["technique_logits"].float().cpu().numpy())
         else:
@@ -218,7 +204,7 @@ def evaluate(model, dataset: MultimodalClipDataset, tokenizer, config: dict,
     if collect_scores:
         # Per-clip arrays for offline analyses (ensemble/late-fusion studies).
         # technique_scores are raw logits under reference_apmeter, otherwise
-        # the mode's native scores (sigmoid / softmax / type-marginalised).
+        # sigmoid probabilities.
         metrics["_arrays"] = {
             "technique_scores": technique_scores.astype(np.float32),
             "technique_labels": technique_labels.astype(np.uint8),

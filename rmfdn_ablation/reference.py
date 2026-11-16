@@ -18,7 +18,6 @@ def encode_reference_batch(model, batch: dict) -> Dict[str, torch.Tensor]:
     features, fused = model.encode(reference_batch)
     encoded = {"fused": fused}
     for modality in model.modalities:
-        encoded[f"contrastive_{modality}"] = (
-            features[modality] if model.contrastive_projections is None
-            else model.contrastive_projections[modality](features[modality]))
+        encoded[f"contrastive_{modality}"] = model.contrastive_projections[modality](
+            features[modality])
     return encoded

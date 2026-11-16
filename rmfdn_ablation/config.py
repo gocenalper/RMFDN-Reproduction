@@ -13,7 +13,7 @@ of the package contains only mechanism:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 # --------------------------------------------------------------------------- #
 # Manipulation-technique taxonomy
@@ -56,8 +56,7 @@ FORGERY_TYPE_TO_TECHNIQUES: Dict[str, Tuple[int, ...]] = {
 TECHNIQUE_INDICES = tuple(range(len(MANIPULATION_TECHNIQUES)))
 
 
-def visible_technique_indices(modalities: Sequence[str],
-                              extra: Sequence[str] = ()) -> Tuple[int, ...]:
+def visible_technique_indices(modalities: Sequence[str]) -> Tuple[int, ...]:
     """Technique bits directly observable from a modality combination.
 
     A bit is observable only if the manipulation leaves evidence *inside* the
@@ -65,18 +64,9 @@ def visible_technique_indices(modalities: Sequence[str],
     (tts/rvc in audio, lip_sync/face_swap in video, llm_textgen in text), but
     the two *shuffle* manipulations splice genuine content into the wrong
     place: the shuffled stream itself is authentic, and only a second stream
-    reveals the mismatch. Which second stream is an empirical question we
-    settled by measurement (Sec. IX of the report): audio_shuffle is
-    detectable from audio+video (94.3 AP) but not from audio+text (35.0 AP,
-    below the 46.4 of audio alone), because the shuffled speech and the
-    shuffled transcript come from the same donor clip and therefore agree
-    with each other -- only the lip track disagrees. text_shuffle, in
-    contrast, is detectable from audio+text (85.7 AP).
-
-    ``extra`` names bits to add to the set regardless of the map. It exists
-    for probe runs that ask whether a modality pair can see a bit we have
-    assigned elsewhere -- the same question, asked the same way, that
-    located audio_shuffle. It is not used by any production cell.
+    reveals the mismatch. audio_shuffle is exposed by audio + video (the lip
+    track disagrees with the speech), text_shuffle by audio + text (the
+    speech disagrees with the transcript).
     """
     visible = set()
     if "v" in modalities:
@@ -89,62 +79,8 @@ def visible_technique_indices(modalities: Sequence[str],
         visible.add(4)                  # audio_shuffle: lip-speech desync only
     if "a" in modalities and "t" in modalities:
         visible.add(6)                  # text_shuffle: speech <-> transcript
-    for name in extra:
-        visible.add(MANIPULATION_TECHNIQUES.index(name))
     return tuple(sorted(visible))
 
-
-#: Short bit names used by the Phase-0/Phase-1 experiment tables
-#: (id-forge-experiment-setup, run_matrix.csv), index-aligned with
-#: MANIPULATION_TECHNIQUES.
-TECHNIQUE_SHORT: Tuple[str, ...] = ("lip", "face", "tts", "rvc", "a_sh", "llm", "tsh")
-
-
-def effective_visible_indices(modalities: Sequence[str],
-                              config: Optional[dict]) -> Tuple[int, ...]:
-    """Observable-bit indices for a run: explicit override or the built-in map.
-
-    ``config["override_visible_bits"]`` (short names, e.g. ``["lip","face"]``)
-    pins the observable set exactly: the Phase-1 grid ships a frozen
-    measurability map that is stricter than the built-in one (a_sh and tsh
-    are never head-observable there). Without the override, the built-in map
-    plus any probe ``extra_visible_bits`` applies unchanged.
-    """
-    names = (config or {}).get("override_visible_bits")
-    if names:
-        return tuple(sorted(TECHNIQUE_SHORT.index(n) for n in names))
-    extra = tuple((config or {}).get("extra_visible_bits") or ())
-    return visible_technique_indices(modalities, extra)
-
-#: 11-class forgery-TYPE softmax head (mlc_loss="type11"): the 11 types are
-#: mutually exclusive, so a single-label softmax over them is well-posed. Ordered
-#: names + their 7-bit templates let us marginalise the type-softmax back to
-#: per-technique scores for the standard 7-bit mAP.
-FORGERY_TYPE_NAMES = tuple(FORGERY_TYPE_TO_TECHNIQUES)
-TYPE_TEMPLATES = tuple(FORGERY_TYPE_TO_TECHNIQUES[t] for t in FORGERY_TYPE_NAMES)
-NUM_FORGERY_TYPES = len(FORGERY_TYPE_NAMES)
-
-#: FakeAVCeleb adapter types (correlation-shift benchmark). Kept OUT of the
-#: canonical dict so the IDForge taxonomy, the type11 softmax and their tests
-#: stay untouched; the data catalog consults both. favc_visualclean is rtvc:
-#: an audio-only forgery whose video is genuine -- is_fake=1 with no visual
-#: bit, the analogue of IDForge's visually-clean fakes.
-FAVC_TYPE_TO_TECHNIQUES: Dict[str, Tuple[int, ...]] = {
-    "favc_lip":         (1, 0, 0, 0, 0, 0, 0),
-    "favc_face":        (0, 1, 0, 0, 0, 0, 0),
-    "favc_face_lip":    (1, 1, 0, 0, 0, 0, 0),
-    "favc_visualclean": (0, 0, 0, 0, 0, 0, 0),
-}
-
-#: Generic bit-pattern adapter: a directory named ``bits_XXXXXXX`` carries its
-#: seven bits literally. Used by non-forgery multi-label benchmarks (e.g. the
-#: movie-genre correlation-shift experiment) where labels are arbitrary
-#: combinations rather than a fixed package taxonomy. The all-zero pattern is
-#: excluded -- such items use ``pristine``, keeping the binary head defined.
-BIT_PATTERN_TYPES: Dict[str, Tuple[int, ...]] = {
-    "bits_" + format(i, "07b"): tuple(int(c) for c in format(i, "07b"))
-    for i in range(1, 128)
-}
 
 #: The seven modality configurations of the ablation grid, ordered light to
 #: heavy. Each is run twice: with and without the identity-reference branch.
@@ -184,7 +120,6 @@ DEFAULT_CONFIG: Dict = dict(
     peak_lr=5e-5,                  # paper schedule
     total_iters=90_000,            # maximum optimizer steps to execute
     lr_schedule_iters=90_000,      # independent cosine horizon (paper schedule)
-    bounded_sampler_pristine=None, # None = natural shuffle; e.g. 0.25 enables bounded balancing
     warmup_iters=1000,             # paper schedule
     warmup_start_lr=2e-7,
     weight_decay=0.01,

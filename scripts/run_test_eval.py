@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Phase 2: evaluate Phase-1 checkpoints on the held-out test split.
+"""Evaluate trained checkpoints on the held-out test split.
 
-Phase 1 trains with ``--skip-test-eval`` (test split unextracted to save
-inodes). Once the test split is extracted, this loads each cell's best-val
-checkpoint and scores the complete test split with live shared reference encoders
-with ACC/AUC/mAP/CF1/OF1 plus per-technique accuracy. Results are written
-incrementally to ``--output`` so a crash/resume re-evaluates only missing cells.
+Training can run with ``--skip-test-eval``. This script then loads each
+cell's best-validation checkpoint from a suite output directory and scores
+the complete test split: binary ACC/AUC and multi-label mAP/CF1/OF1 plus
+per-technique accuracy. Results are written to ``--output`` after every cell,
+so a relaunch evaluates only the missing cells.
 
-The model architecture is canonical and the matrix ``spec`` restores its
-modalities, fusion type, protocol, and reference arm.
+The training configuration saved in ``results.json`` is restored for every
+cell; only model paths and batch/worker counts can be overridden here.
 """
 
 import argparse
@@ -23,11 +23,12 @@ import numpy as np
 import torch
 
 from rmfdn_ablation.config import (MANIPULATION_TECHNIQUES, MODALITY_CONFIGS,
-                                   default_device, effective_visible_indices)
+                                   default_device, visible_technique_indices)
 from rmfdn_ablation.data_catalog import scan_reference_clips
 from rmfdn_ablation.dataset import MultimodalClipDataset
 from rmfdn_ablation.evaluation import evaluate
 from rmfdn_ablation.protocols import build_protocol_splits
+from rmfdn_ablation.RMFDN import RMFDN
 
 _MODALITIES_BY_NAME = dict(MODALITY_CONFIGS)
 
@@ -42,18 +43,13 @@ def _result_directory(phase1_dir: Path) -> Path:
 def _evaluation_config(run: dict, args) -> dict:
     """Restore training config and apply only explicit runtime/path overrides."""
     if "config" not in run:
-        raise ValueError("phase-1 result has no saved effective config")
+        raise ValueError("training result has no saved effective config")
     config = dict(run["config"])
     for key in ("bert_model", "ast_checkpoint", "batch_size", "num_workers"):
         value = getattr(args, key)
         if value is not None:
             config[key] = value
     return config
-
-
-def _model_class(cross_modal):
-    from rmfdn_ablation.experiment import model_class_for
-    return model_class_for(cross_modal)
 
 
 def _load_evaluation_checkpoint(suite_dir: Path, name: str, device: str,
@@ -95,7 +91,7 @@ def _load_evaluation_checkpoint(suite_dir: Path, name: str, device: str,
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Phase-2 held-out test evaluation")
+    ap = argparse.ArgumentParser(description="Held-out test evaluation of trained cells")
     ap.add_argument("--checkpoint", choices=["best_validation", "final"],
                     default="best_validation",
                     help="which trained weights to score (final needs --final-eval training)")
@@ -129,10 +125,7 @@ def main():
     suite_dir = _result_directory(Path(args.phase1_dir))
     results_path = suite_dir / "results.json"
     training_results = json.load(open(results_path))
-    first_runnable = next(
-        run for run in training_results.values() if run.get("status") != "not_implemented"
-    )
-    base_config = _evaluation_config(first_runnable, args)
+    base_config = _evaluation_config(next(iter(training_results.values())), args)
 
     device = default_device()
     tokenizer = BertTokenizer.from_pretrained(base_config["bert_model"])
@@ -145,10 +138,6 @@ def main():
     for name, run in training_results.items():
         spec = run.get("spec")
         if not spec or name in out:
-            continue
-        if run.get("status") == "not_implemented":
-            out[name] = run
-            json.dump(out, open(args.output, "w"), indent=1)
             continue
         checkpoint_state, checkpoint_meta = _load_evaluation_checkpoint(
             suite_dir, name, device, args.checkpoint)
@@ -165,7 +154,7 @@ def main():
                    "reference_alpha": (saved_config["reference_alpha"]
                                        if use_reference else 0.0)}
 
-        model = _model_class(spec["cross_modal"])(run_cfg, modalities).to(device)
+        model = RMFDN(run_cfg, modalities).to(device)
         model.load_state_dict(checkpoint_state)
 
         if spec["protocol"] not in split_cache:
@@ -177,10 +166,7 @@ def main():
             test_clips, modalities, run_cfg,
             reference_index=reference_index if use_reference else None,
             reference_seed=run_cfg["seed"])
-        # A probe run widened its own visible set, and a Phase-1 run may pin
-        # it outright; score exactly what the run supervised, so the eval
-        # matches the training contract.
-        technique_indices = (effective_visible_indices(modalities, saved_config)
+        technique_indices = (visible_technique_indices(modalities)
                              if args.visible_bits_only else None)
         metrics = evaluate(model, dataset, tokenizer, run_cfg, device,
                            technique_indices=technique_indices,

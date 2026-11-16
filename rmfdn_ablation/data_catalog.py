@@ -23,12 +23,7 @@ from __future__ import annotations
 import os
 from typing import Dict, List, Sequence
 
-from .config import (BIT_PATTERN_TYPES, FAVC_TYPE_TO_TECHNIQUES,
-                     FORGERY_TYPE_TO_TECHNIQUES)
-
-#: IDForge types plus the FakeAVCeleb adapter types; directory names resolve here.
-_ALL_TYPES = {**FORGERY_TYPE_TO_TECHNIQUES, **FAVC_TYPE_TO_TECHNIQUES,
-              **BIT_PATTERN_TYPES}
+from .config import FORGERY_TYPE_TO_TECHNIQUES
 
 #: Filenames that mark a directory as a clip. ``frames.jpz(.npz)`` holds
 #: JPEG-encoded frames (full dataset); ``frames_ndarray.npy`` raw uint8
@@ -69,7 +64,7 @@ class ClipRecord:
         self.forgery_type = forgery_type
         self.identity = identity_from_path(directory)
         self.is_fake = 0 if forgery_type == "pristine" else 1
-        self.technique_targets = _ALL_TYPES[forgery_type]
+        self.technique_targets = FORGERY_TYPE_TO_TECHNIQUES[forgery_type]
 
 
 def scan_split_clips(data_root: str, split: str) -> List[ClipRecord]:
@@ -87,7 +82,7 @@ def scan_split_clips(data_root: str, split: str) -> List[ClipRecord]:
     clips: List[ClipRecord] = []
     for forgery_type in sorted(os.listdir(split_dir)):
         type_dir = os.path.join(split_dir, forgery_type)
-        if forgery_type not in _ALL_TYPES or not os.path.isdir(type_dir):
+        if forgery_type not in FORGERY_TYPE_TO_TECHNIQUES or not os.path.isdir(type_dir):
             continue
         for directory, _subdirs, filenames in os.walk(type_dir):
             if _has_frame_archive(filenames):

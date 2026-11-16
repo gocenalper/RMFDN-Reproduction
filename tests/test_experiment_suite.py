@@ -20,28 +20,18 @@ def test_spec_name():
     assert spec.name == "m1_i1_p2_VAT"
 
 
-def test_expand_cells_matches_advisor_matrix():
+def test_expand_cells_matches_declared_matrix():
     cells = json.load(open(Path(__file__).resolve().parents[1]
                            / "experiments" / "experiment_matrix.json"))["cells"]
     specs = expand_cells(cells)
-    # 7 + 1 + 1 + 1 + 1 + 1 + 1 + 7 = 20 runs total
-    assert len(specs) == 20
+    # 7 + 1 + 1 + 4 = 13 runs total
+    assert len(specs) == 13
     names = {s.name for s in specs}
     assert "m1_i1_p1_V" in names and "m1_i1_p1_VAT" in names
-    assert "m2_i2_p2_AT" in names
+    assert "m1_i3_p2_VAT" in names
     assert len({s.protocol for s in specs}) == 2  # both p1 and p2 present
-
-
-def test_matrix_has_twelve_runnable_and_eight_explicitly_skipped_specs():
-    cells = json.load(open(Path(__file__).resolve().parents[1]
-                           / "experiments" / "experiment_matrix.json"))["cells"]
-    specs = expand_cells(cells)
-
-    runnable = [spec for spec in specs if spec.identity != "i2"]
-    skipped = [spec for spec in specs if spec.identity == "i2"]
-
-    assert len(runnable) == 12
-    assert len(skipped) == 8
+    for spec in specs:
+        resolve_reference_flag(spec)  # every declared cell is runnable
 
 
 def test_reference_flag_mapping():
@@ -49,22 +39,13 @@ def test_reference_flag_mapping():
     assert resolve_reference_flag(ExperimentSpec("m1", "i3", "p1", "VAT")) is False
 
 
-def test_m2_reference_flag_resolves():
-    # m2 (MulG fusion) is implemented; the reference flag is identity-driven and
-    # independent of the cross_modal choice, so m2 resolves like m1.
-    assert resolve_reference_flag(ExperimentSpec("m2", "i1", "p2", "VAT")) is True
-    assert resolve_reference_flag(ExperimentSpec("m2", "i3", "p2", "VAT")) is False
-
-
-def test_unimplemented_axes_raise():
-    # Only i2 (verification-based identity) remains unimplemented, regardless of
-    # the cross_modal fusion (m1 or m2).
+def test_unknown_axes_raise():
     for spec in [ExperimentSpec("m1", "i2", "p2", "VAT"),
-                 ExperimentSpec("m2", "i2", "p2", "VAT")]:
+                 ExperimentSpec("m2", "i1", "p2", "VAT")]:
         try:
             resolve_reference_flag(spec)
-            assert False, f"expected NotImplementedError for {spec.name}"
-        except NotImplementedError:
+            assert False, f"expected ValueError for {spec.name}"
+        except ValueError:
             pass
 
 

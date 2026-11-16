@@ -28,8 +28,7 @@ def test_training_cli_historical_diagnostic_flags_stay_removed():
     """Removed one-off diagnostic flags must not resurface in the training CLI.
 
     Guards the paper-faithful surface: historical crop/augment/encoder-swap
-    experiment flags stay deleted, while the retained bounded-sampler flag
-    remains exposed.
+    and sampler experiment flags stay deleted.
     """
     help_text = _script_help("scripts/run_experiment_suite.py")
 
@@ -44,7 +43,9 @@ def test_training_cli_historical_diagnostic_flags_stay_removed():
     assert "--no-fusion-ffn" not in help_text
     assert "--balanced-sampler-pristine" not in help_text
     assert "--uniform-sampler-pristine" not in help_text
-    assert "--bounded-sampler-pristine" in help_text
+    assert "--bounded-sampler-pristine" not in help_text
+    assert "--text-encoder" not in help_text
+    assert "--oracle-poe" not in help_text
 
 
 def test_evaluation_cli_has_no_historical_diagnostic_controls():

@@ -1,27 +1,17 @@
-"""Configurable experiment suite: run a declared matrix of setups in sequence.
+"""Experiment matrix: run a declared list of setups in sequence.
 
-The advisor's study spans three independent axes:
+A run is one cell of the matrix, defined by
 
-* **protocol**   -- ``p1`` (original split) or ``p2`` (identity-disjoint),
-* **cross_modal**-- ``m0`` (frozen experts + concatenation readout),
-  ``m1`` (original cross-attention fusion) or ``m2`` (MulG),
-* **identity**   -- ``i1`` (closed-set reference), ``i2`` (verification-based,
-  open-set) or ``i3`` (no identity pipeline).
+* **protocol**    -- ``p1`` (official IDForge split) or ``p2`` (identity-disjoint),
+* **identity**    -- ``i1`` (identity reference on) or ``i3`` (reference off),
+* **cross_modal** -- always ``m1``, the R-MFDN progressive cross-attention fusion,
+* **modality**    -- any non-empty subset of visual / audio / text.
 
-A run is one (axis combination, modality configuration) cell, e.g.
+and named ``<cross_modal>_<identity>_<protocol>_<modality>``, for example
 ``m1_i1_p1_VAT``. The matrix is declared as data (see
-``experiments/experiment_matrix.json``) so new setups need no code change --
-just another entry. :func:`run_experiment_sequence` executes the declared
-specs in order, resume-safely.
-
-Current implementation status:
-
-* ``m1`` (original progressive-cross-attention fusion) and ``m2`` (MulG
-  directed pairwise cross-modal attention + GRU fusion) are both wired to the
-  trainer via :func:`resolve_model_class`.
-* ``i1`` / ``i3`` (reference on/off) are wired; ``i2`` (verification-based
-  identity) is recognised but raises :class:`NotImplementedError`, so the
-  suite records those cells as ``not_implemented`` and continues.
+``experiments/experiment_matrix.json``), so a new setup needs no code change.
+:func:`run_experiment_sequence` executes the declared specs in order and can
+be relaunched: finished runs are skipped.
 """
 
 from __future__ import annotations
@@ -40,7 +30,6 @@ from .trainer import run_single_experiment
 _MODALITIES_BY_NAME = dict(MODALITY_CONFIGS)
 
 #: identity axis -> whether the identity-reference branch is active.
-#: i2 (verification-based) is intentionally absent -- it raises until designed.
 _IDENTITY_USES_REFERENCE = {"i1": True, "i3": False}
 
 
@@ -48,8 +37,8 @@ _IDENTITY_USES_REFERENCE = {"i1": True, "i3": False}
 class ExperimentSpec:
     """One runnable cell of the matrix."""
 
-    cross_modal: str   # 'm1' | 'm2'
-    identity: str      # 'i1' | 'i2' | 'i3'
+    cross_modal: str   # 'm1'
+    identity: str      # 'i1' | 'i3'
     protocol: str      # 'p1' | 'p2'
     modality: str      # 'V' | 'A' | 'T' | 'VA' | 'VT' | 'AT' | 'VAT'
 
@@ -70,41 +59,12 @@ def expand_cells(cells: List[dict]) -> List[ExperimentSpec]:
 
 
 def resolve_reference_flag(spec: ExperimentSpec) -> bool:
-    """Map a spec's axes to the trainer's ``use_reference`` flag.
-
-    The reference flag depends only on the identity axis (it is independent of
-    the cross_modal fusion choice). Raises NotImplementedError for ``i2``
-    (verification-based identity), which is declared but not yet built.
-    """
-    if spec.cross_modal not in ("m0", "m1", "m2"):
+    """Map a spec's identity axis to the trainer's ``use_reference`` flag."""
+    if spec.cross_modal != "m1":
         raise ValueError(f"unknown cross_modal: {spec.cross_modal!r}")
-    if spec.identity == "i2":
-        raise NotImplementedError(
-            "identity 'i2' (verification-based, open-set) is not implemented yet")
     if spec.identity not in _IDENTITY_USES_REFERENCE:
         raise ValueError(f"unknown identity: {spec.identity!r}")
     return _IDENTITY_USES_REFERENCE[spec.identity]
-
-
-def model_class_for(cross_modal: str):
-    """Map a cross_modal axis value to its fusion architecture class.
-
-    ``m0`` -> :class:`~rmfdn_ablation.staged.StagedFusion` (frozen unimodal
-    experts, concatenation readout -- no cross-modal interaction),
-    ``m1`` -> :class:`~rmfdn_ablation.RMFDN.RMFDN` (progressive cross-attention),
-    ``m2`` -> :class:`~rmfdn_ablation.mulG_RMFDN.MulGRmfdn` (MulG directed pairwise
-    cross-modal attention + GRU fusion). Imports are deferred so this module
-    stays importable without the deep-learning stack.
-    """
-    from .RMFDN import RMFDN
-    from .mulG_RMFDN import MulGRmfdn
-    from .staged import StagedFusion
-    return {"m0": StagedFusion, "m1": RMFDN, "m2": MulGRmfdn}[cross_modal]
-
-
-def resolve_model_class(spec: ExperimentSpec):
-    """Select the fusion architecture for a spec's cross_modal axis."""
-    return model_class_for(spec.cross_modal)
 
 
 def run_experiment_sequence(specs: List[ExperimentSpec], config: dict,
@@ -125,7 +85,7 @@ def run_experiment_sequence(specs: List[ExperimentSpec], config: dict,
     os.makedirs(output_dir, exist_ok=True)
     tokenizer = BertTokenizer.from_pretrained(config["bert_model"])
     # The reference bank is only consulted by i1 cells; scanning it is an
-    # expensive GPFS walk, so skip it outright when no spec needs it.
+    # expensive directory walk, so skip it outright when no spec needs it.
     reference_index = (scan_reference_clips(reference_root)
                        if any(resolve_reference_flag(spec) for spec in specs)
                        else None)
@@ -152,24 +112,10 @@ def run_experiment_sequence(specs: List[ExperimentSpec], config: dict,
             print(f"[{spec.name}] already recorded -> skipped", flush=True)
             continue
 
-        # Axes that aren't built yet are recorded and skipped, not fatal.
-        try:
-            use_reference = resolve_reference_flag(spec)
-        except NotImplementedError as error:
-            print(f"[{spec.name}] SKIPPED -- {error}", flush=True)
-            results[spec.name] = {"status": "not_implemented", "reason": str(error),
-                                  "spec": asdict(spec)}
-            json.dump(results, open(results_path, "w"), indent=1)
-            continue
-
-        model_class = resolve_model_class(spec)
+        use_reference = resolve_reference_flag(spec)
         modalities = _MODALITIES_BY_NAME[spec.modality]
         splits = splits_for(spec.protocol)
         train_clips = splits["train"]
-        if config.get("no_pristine_train"):
-            train_clips = [clip for clip in train_clips if clip.is_fake]
-            print(f"[{spec.name}] pristine TRAIN'den cikarildi -> "
-                  f"{len(train_clips)} klip (yalniz fake)", flush=True)
         val_clips = splits["val"]
         if val_cap and len(val_clips) > val_cap:                 # fixed seed-0 subsample
             import random
@@ -181,7 +127,6 @@ def run_experiment_sequence(specs: List[ExperimentSpec], config: dict,
                 spec.name, modalities, use_reference,
                 train_clips, val_clips, splits["test"],
                 reference_index, tokenizer, config, output_dir, device,
-                model_class=model_class,
                 skip_test_eval=config.get("skip_test_eval", False))
             run_result["spec"] = asdict(spec)
             results[spec.name] = run_result

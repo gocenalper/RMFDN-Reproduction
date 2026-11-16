@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "rmfdn-ablation"
 version = "1.0.0"
-description = "R-MFDN modality x reference ablation on IDForge_v2"
+description = "R-MFDN reproduction and modality x reference ablation on IDForge_v2"
 requires-python = ">=3.9"
 dependencies = [
   "torch",
@@ -14,8 +14,12 @@ dependencies = [
   "transformers",
   "scikit-learn",
   "numpy",
-  "opencv-python",
+  "opencv-python-headless",
+  "soundfile",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest"]
 
 [tool.setuptools.packages.find]
 include = ["rmfdn_ablation*"]

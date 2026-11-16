@@ -1,0 +1,14 @@
+.git
+.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+*.egg-info
+suite_out
+smoke_out
+*_out
+runs
+tmp
+*.pt
+*.npz
+*.npy

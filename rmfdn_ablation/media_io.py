@@ -21,6 +21,9 @@ import torch.nn.functional as F
 #: Lazily-constructed AST feature extractor (pretrained-AST audio path).
 _AST_EXTRACTOR = None
 
+#: Set after the first undecodable-audio warning so logs are not flooded.
+_AUDIO_WARNING_SHOWN = False
+
 
 def _ensure_numpy_pickle_compat() -> None:
     """Let NumPy 1.x open object arrays created by NumPy 2.x."""
@@ -95,6 +98,40 @@ def load_frame_tensor(clip_directory: str, config: dict) -> torch.Tensor:
     return tensor
 
 
+def _decode_audio(path: str):
+    """Decode an audio file to a float32 ``(channels, samples)`` tensor.
+
+    libsndfile (via ``soundfile``) reads wav / flac / mp3 identically on every
+    platform and needs no system codec. Containers it cannot open (``.m4a``)
+    fall back to ``torchaudio.load``, whose backend depends on the installed
+    torchaudio version.
+    """
+    try:
+        import soundfile
+
+        samples, sample_rate = soundfile.read(path, dtype="float32", always_2d=True)
+        return torch.from_numpy(samples.T.copy()), sample_rate
+    except Exception:
+        import torchaudio
+
+        return torchaudio.load(path)
+
+
+def _warn_undecodable_audio(path: str, error: Exception) -> None:
+    """Say once per process that an existing audio file could not be decoded.
+
+    The clip still loads (as silence) so a single broken file cannot abort a
+    long run, but a decoder that fails for *every* file -- a missing audio
+    backend -- must not pass unnoticed.
+    """
+    global _AUDIO_WARNING_SHOWN
+    if not _AUDIO_WARNING_SHOWN:
+        _AUDIO_WARNING_SHOWN = True
+        print(f"[media_io] WARNING: could not decode {path} ({error!r}); "
+              f"using silence. Further decode failures are not reported.",
+              file=sys.stderr, flush=True)
+
+
 def load_ast_input(clip_directory: str, basename: str, config: dict) -> torch.Tensor:
     """Load audio as pretrained-AST ``input_values`` ``(1024, 128)``.
 
@@ -116,9 +153,10 @@ def load_ast_input(clip_directory: str, basename: str, config: dict) -> torch.Te
         candidate = os.path.join(clip_directory, basename + extension)
         if os.path.exists(candidate):
             try:
-                waveform, sample_rate = torchaudio.load(candidate)
+                waveform, sample_rate = _decode_audio(candidate)
                 break
-            except Exception:
+            except Exception as error:
+                _warn_undecodable_audio(candidate, error)
                 waveform = None
     if waveform is None:
         return torch.zeros(max_len, num_bins)
