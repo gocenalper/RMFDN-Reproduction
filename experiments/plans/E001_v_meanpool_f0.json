@@ -1,0 +1,82 @@
+{
+  "exp_id": "E001_v_meanpool_f0",
+  "created": "2026-09-30",
+  "baseline": "experiments/baselines/runs4f/f0/V_base/results.json::m1_i3_p2_V",
+  "_baseline_note": "R-MFDN V cell, P2 fold f0, reference-free (i3), visibility-aligned; BSC $S/runs4f/f0/V_base (job 44511068, 48 min). Test: ACC 73.60 / AUC 84.29 / mAP(lip,face) 81.97, lip 96.14, face 67.80.",
+  "factor": {
+    "key": "no_temporal_transformer",
+    "baseline_value": "<absent>",
+    "value": true,
+    "_note": "baseline config has no key = default False (2-layer temporal transformer over 4 groups x 4 frames). True = plain mean over the 16 per-frame ResNet-18 embeddings. This is C0's visual stream."
+  },
+  "hypothesis": "Dropping the temporal transformer (plain 16-frame mean-pool) does not lower f0 test mAP(lip,face); in particular face_swap AP stays >= 67.8 and AUC stays within +-1. P1 evidence: mAP 65.88 -> 70.16 with AUC flat.",
+  "success_metric": "test.mAP",
+  "expected_direction": "up",
+  "watched": {
+    "test.per_bit_ap.face_swap": "must not drop below baseline 67.80",
+    "test.AUC": "within +-1.0"
+  },
+  "budget": {
+    "iters": 6000,
+    "est_gpu_hours": 1.0,
+    "_note": "baseline V cell: 43 min train + ~5 min test eval on one H100"
+  },
+  "spec": {
+    "cross_modal": "m1",
+    "identity": "i3",
+    "protocol": "p2",
+    "modality": "V"
+  },
+  "config": {
+    "attention_heads": 8,
+    "contrastive_dim": 128,
+    "embed_dim": 512,
+    "frame_groups": 4,
+    "frames_per_clip": 16,
+    "image_size": 224,
+    "ast_checkpoint": "/gpfs/scratch/<account>/<user>/env/models/ast",
+    "max_audio_seconds": 8.0,
+    "sample_rate": 16000,
+    "bert_model": "/gpfs/scratch/<account>/<user>/env/models/bert-base-uncased",
+    "max_text_tokens": 50,
+    "backbone_lr_scale": 1.0,
+    "batch_size": 64,
+    "grad_clip_norm": 1.0,
+    "min_lr": 1e-08,
+    "peak_lr": 5e-05,
+    "total_iters": 6000,
+    "lr_schedule_iters": 90000,
+    "bounded_sampler_pristine": null,
+    "warmup_iters": 1000,
+    "warmup_start_lr": 2e-07,
+    "weight_decay": 0.01,
+    "cross_modal_beta": 0.2,
+    "identity_gamma": 0.2,
+    "reference_alpha": 0.001,
+    "temperature": 1.0,
+    "early_stop_patience": 8,
+    "eval_interval": 1500,
+    "log_interval": 100,
+    "num_workers": 16,
+    "seed": 0,
+    "grad_accum_steps": 2,
+    "mask_invisible_bits": true,
+    "mlc_loss": "bce",
+    "skip_test_eval": true,
+    "no_temporal_transformer": true
+  },
+  "launch": {
+    "cluster": "BSC MN5 acc, code $S/code/idforge-final, template experiments/launch/c0_cell.slurm",
+    "flags": "EXP=E001_v_meanpool_f0 FOLD=0 MOD=V EXTRA='--no-temporal-transformer' sbatch experiments/launch/c0_cell.slurm",
+    "suite_command": "python3 scripts/run_experiment_suite.py --config $RUN/cfg.json --p2-split $S/folds/fold_F0.json --data-root $S/data/idforge_root --reference-root $S/data/idforge_ref54/ref --output-dir $RUN --bert-model $E/models/bert-base-uncased --ast-checkpoint $E/models/ast --iters 6000 --lr-schedule-iters 90000 --eval-interval 1500 --patience 8 --batch-size 64 --grad-accum-steps 2 --num-workers 16 --skip-test-eval --mlc-loss bce --mask-invisible-bits --no-temporal-transformer",
+    "job_id": 46846842,
+    "submitted": "2026-09-30"
+  },
+  "status": "done",
+  "results": {
+    "results_json": "experiments/runs/c0/f0/E001_v_meanpool_f0/results.json",
+    "test_eval_json": "experiments/runs/c0/f0/E001_v_meanpool_f0/test_results.json",
+    "_expected": "$S/runs_c0/f0/E001_v_meanpool_f0/{results.json,test_results.json}; pulled to experiments/runs/c0/f0/E001_v_meanpool_f0/ after the run",
+    "bsc_run_dir": "/gpfs/scratch/<account>/<user>/runs_c0/f0/E001_v_meanpool_f0"
+  }
+}

@@ -1,0 +1,15 @@
+condition_id,reference_condition,stage,modality_scope,single_changed_parameter,control_value,architecture,paper_hyperparameters,result_status,reported_modality,ACC,AUC,mAP,CF1,OF1
+C0,,train,"V|A|T|VA|VT|AT|VAT",none,"natural sampler; BCE+sigmoid; all-bit labels","paper-exact locked","locked","VT complete; VA in progress; remaining cells need clean run",VT,82.93,92.39,86.31,78.99,82.04
+S1,C0,train,"V|A|T|VA|VT|AT|VAT",sampler,historical_balanced_25_percent_pristine,"paper-exact locked","locked",needs_clean_rerun,,,,,,
+S2,C0,train,"V|A|T|VA|VT|AT|VAT",sampler,bounded_decor,"paper-exact locked","locked",needs_clean_rerun,,,,,,
+L1,C0,train,"V|A|T|VA|VT|AT|VAT",mlc_formulation,raw_multihot_softmax_ce,"paper-exact locked","locked",needs_clean_rerun,,,,,,
+L2,C0,train,"V|A|T|VA|VT|AT|VAT",mlc_formulation,normalized_target_softmax_ce,"paper-exact locked","locked",needs_clean_rerun,,,,,,
+M1,C0,train,"V|A|T|VA|VT|AT|VAT",mask_invisible_bits,on,"paper-exact locked","locked","VT complete; VA masked complete",VT,81.06,91.46,53.79,51.80,51.03
+B1,C0,train,"V|A|T|VA|VT|AT|VAT",batch_size,"24; grad_accumulation=2","paper-exact locked","locked",deferred,,,,,,
+B2,C0,train,"V|A|T|VA|VT|AT|VAT",batch_size,"128; grad_accumulation=2","paper-exact locked","locked",deferred,,,,,,
+V1,C0,train,"V|A|T|VA|VT|AT|VAT",validation_scope,fixed_4000,"paper-exact locked","locked",deferred,,,,,,
+E1,L1,evaluation,"V|A|T|VA|VT|AT|VAT",f1_threshold,global_validation_selected,"paper-exact locked","locked",pending_no_retrain,,,,,,
+E2,L2,evaluation,"V|A|T|VA|VT|AT|VAT",f1_threshold,global_validation_selected,"paper-exact locked","locked",pending_no_retrain,,,,,,
+E3,M1,evaluation,"V|A|T|VA|VT|AT|VAT",metric_bits,visible_only,"paper-exact locked","locked","VT complete diagnostic; not paper-comparable",VT,81.06,91.46,95.90,85.47,86.26
+E4,C0,evaluation,"V|A|T|VA|VT|AT|VAT",pristine_metric_scope,exclude_pristine_for_attribution_only,"paper-exact locked","locked",pending_no_retrain,,,,,,
+E5,C0,evaluation,"V|A|T|VA|VT|AT|VAT",checkpoint_objective,validation_mAP,"paper-exact locked","locked",pending_no_retrain,,,,,,

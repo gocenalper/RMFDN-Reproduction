@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Data and model artifacts
+*.pt
+*.npz
+*.wav
+*.mp4
+*_progress.json
+
+# OS
+.DS_Store
+
+*.npy
+runs/
+
+# Cluster logs
+*.out
+*.err
+*.log
+
+# Data archives & extracted dataset roots (built/staged locally)
+*.zip
+/dataset/
+/idforge_*/
+
+# Matrix outputs
+suite_out/
+*_out/
+
+# Local Codex state and disposable worktrees
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+
+# Local scratch (session artifacts, staged archives)
+/tmp/

@@ -1,0 +1,66 @@
+{
+ "exp_id": "E001_v_meanpool_f0",
+ "generated": "2026-09-30T19:49:26.228108",
+ "git_head": "259df1f",
+ "run_name": "m1_i3_p2_V",
+ "factor": {
+  "key": "no_temporal_transformer",
+  "baseline_value": "<absent>",
+  "value": true,
+  "_note": "baseline config has no key = default False (2-layer temporal transformer over 4 groups x 4 frames). True = plain mean over the 16 per-frame ResNet-18 embeddings. This is C0's visual stream."
+ },
+ "baseline": "experiments/baselines/runs4f/f0/V_base/results.json::m1_i3_p2_V",
+ "success_metric": "test.mAP",
+ "verdict": "SUPPORTED",
+ "delta": 5.8520693147420815,
+ "candidate": {
+  "best_val": 86.0198,
+  "minutes": 43.0,
+  "ACC": 74.97444905780901,
+  "AUC": 85.45676696908725,
+  "mAP": 87.81912565354271,
+  "CF1": 80.16249523607782,
+  "OF1": 82.84274925737273
+ },
+ "baseline_metrics": {
+  "best_val": 86.2515,
+  "minutes": 43.1,
+  "ACC": 73.60108591504311,
+  "AUC": 84.29002013623969,
+  "mAP": 81.96705633880063,
+  "CF1": 75.5633581803959,
+  "OF1": 78.52552723141378
+ },
+ "per_bit_acc": {
+  "candidate": {
+   "lip_sync": 86.40051101884382,
+   "face_swap": 84.17598211434047
+  },
+  "baseline": {
+   "lip_sync": 84.42031299904184,
+   "face_swap": 76.94346854040242
+  }
+ },
+ "sources": [
+  {
+   "path": "experiments/plans/E001_v_meanpool_f0.json",
+   "sha256_12": "18678cec7e7d"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E001_v_meanpool_f0/results.json",
+   "sha256_12": "65df6f39bb9d"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E001_v_meanpool_f0/test_results.json",
+   "sha256_12": "8a1a0d8ed444"
+  },
+  {
+   "path": "experiments/baselines/runs4f/f0/V_base/results.json",
+   "sha256_12": "c1eaef03285a"
+  },
+  {
+   "path": "experiments/baselines/runs4f/f0/V_base/test_results.json",
+   "sha256_12": "e798be2c763e"
+  }
+ ]
+}

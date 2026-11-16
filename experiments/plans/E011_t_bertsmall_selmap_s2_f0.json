@@ -1,0 +1,85 @@
+{
+  "exp_id": "E011_t_bertsmall_selmap_s2_f0",
+  "created": "2026-10-01",
+  "baseline": "experiments/plans/E009_t_bertsmall_selmap_f0.json",
+  "_baseline_note": "E009: BERT-small T cell, f0, seed 0, eval 500, checkpoint by val mAP. Test llm AP 89.66 (checkpoint iter 2000). Ladder on this fold: bag 56.81, minitf 75.74, BERT-mini 86.96, BERT-small/AUC-sel 88.58, /eval500 84.96, /mAP-sel 89.66. BERT-base T_base 91.60 is itself a single seed (fold spread 91.6-93.7).",
+  "factor": {
+    "key": "seed",
+    "baseline_value": 0,
+    "value": 2,
+    "_note": "Training seed only (init of projection/heads, sampler order, dropout). Encoder weights are the same pretrained BERT-small. Everything else identical to E009."
+  },
+  "hypothesis": "Seed 2 of the E009 recipe lands within a few AP points of 89.66: the seed spread of this cell decides whether the 1.9-point gap to BERT-base's single-seed 91.60 is real or noise before spending more capacity (BERT-medium). Target still >= 91.0.",
+  "success_metric": "test.mAP",
+  "_success_note": "test.mAP == llm_textgen AP (nkeep=1). Verdict is strict-sign vs E009 (89.66) and is not the point; the deliverable is mean +- spread over seeds 0,1,2 (E009, E010, E011) against 91.60.",
+  "expected_direction": "up",
+  "watched": {
+    "test.per_bit_ap.llm_textgen": "spread over seeds 0/1/2; does any seed reach >= 91.0?",
+    "best_val_iter": "does the val-mAP peak stay near 2000?",
+    "minutes": "expect ~3"
+  },
+  "budget": {
+    "iters": 6000,
+    "est_gpu_hours": 0.2
+  },
+  "spec": {
+    "cross_modal": "m1",
+    "identity": "i3",
+    "protocol": "p2",
+    "modality": "T"
+  },
+  "config": {
+    "attention_heads": 8,
+    "contrastive_dim": 128,
+    "embed_dim": 512,
+    "frame_groups": 4,
+    "frames_per_clip": 16,
+    "image_size": 224,
+    "ast_checkpoint": "/gpfs/scratch/<account>/<user>/env/models/ast",
+    "max_audio_seconds": 8.0,
+    "sample_rate": 16000,
+    "bert_model": "/gpfs/scratch/<account>/<user>/env/models/bert-base-uncased",
+    "max_text_tokens": 50,
+    "backbone_lr_scale": 1.0,
+    "batch_size": 64,
+    "grad_clip_norm": 1.0,
+    "min_lr": 1e-08,
+    "peak_lr": 5e-05,
+    "total_iters": 6000,
+    "lr_schedule_iters": 90000,
+    "bounded_sampler_pristine": null,
+    "warmup_iters": 1000,
+    "warmup_start_lr": 2e-07,
+    "weight_decay": 0.01,
+    "cross_modal_beta": 0.2,
+    "identity_gamma": 0.2,
+    "reference_alpha": 0.001,
+    "temperature": 1.0,
+    "early_stop_patience": 8,
+    "eval_interval": 500,
+    "log_interval": 100,
+    "num_workers": 16,
+    "seed": 2,
+    "grad_accum_steps": 2,
+    "mask_invisible_bits": true,
+    "mlc_loss": "bce",
+    "skip_test_eval": true,
+    "text_encoder": "bertsmall",
+    "bert_small_model": "/gpfs/scratch/<account>/<user>/env/models/bert-small",
+    "select_metric": "mAP"
+  },
+  "launch": {
+    "cluster": "BSC MN5 acc, code $S/code/idforge-final, template experiments/launch/c0_cell.slurm",
+    "flags": "EXP=E011_t_bertsmall_selmap_s2_f0 FOLD=0 MOD=T EVAL=500 EXTRA='--text-encoder bertsmall --bert-small-model /gpfs/scratch/<account>/<user>/env/models/bert-small --select-metric mAP --seed 2' sbatch --export=ALL,EXP,FOLD,MOD,EVAL,EXTRA experiments/launch/c0_cell.slurm",
+    "_check": "confirm the suite exposes --seed before launch",
+    "job_id": 46861931,
+    "submitted": "2026-10-01"
+  },
+  "status": "done",
+  "results": {
+    "results_json": "experiments/runs/c0/f0/E011_t_bertsmall_selmap_s2_f0/results.json",
+    "test_eval_json": "experiments/runs/c0/f0/E011_t_bertsmall_selmap_s2_f0/test_results.json",
+    "_expected": "$S/runs_c0/f0/E011_t_bertsmall_selmap_s2_f0/{results.json,test_results.json}; pulled after the run",
+    "bsc_run_dir": "/gpfs/scratch/<account>/<user>/runs_c0/f0/E011_t_bertsmall_selmap_s2_f0"
+  }
+}

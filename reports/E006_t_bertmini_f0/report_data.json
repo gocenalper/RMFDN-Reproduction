@@ -1,0 +1,64 @@
+{
+ "exp_id": "E006_t_bertmini_f0",
+ "generated": "2026-10-01T00:25:47.961786",
+ "git_head": "259df1f",
+ "run_name": "m1_i3_p2_T",
+ "factor": {
+  "key": "text_encoder",
+  "baseline_value": "<absent>",
+  "value": "bertmini",
+  "_note": "absent = BERT-base (paper encoder). bertmini = the same TextEncoder (mask-weighted mean pool + Linear 256->512) over prajjwal1/bert-mini (4 layers x 256 hidden, 4 heads, FFN 1024; 11,170,560 encoder params, 11.30M with projection; MLM-pretrained, uncased WordPiece vocab byte-identical to bert-base-uncased so the tokenizer is unchanged), fine-tuned end to end at the same LR. Checkpoint path lives in the environment key bert_mini_model (BSC $S/env/models/bert-mini, pytorch_model.bin md5 83cb6c1bb924adb5c34d7110dfbb840d, from HF hub 2026-10-01)."
+ },
+ "baseline": "experiments/baselines/runs4f/f0/T_base/results.json::m1_i3_p2_T",
+ "success_metric": "test.mAP",
+ "verdict": "NOT SUPPORTED",
+ "delta": -4.633797762578837,
+ "candidate": {
+  "best_val": 68.7641,
+  "minutes": 2.4,
+  "ACC": 66.42286809326093,
+  "AUC": 70.32944788907275,
+  "mAP": 86.96418165796686,
+  "CF1": 77.67505196015193,
+  "OF1": 77.67505196015193
+ },
+ "baseline_metrics": {
+  "best_val": 62.5995,
+  "minutes": 5.9,
+  "ACC": 63.45257106355797,
+  "AUC": 66.85758105512934,
+  "mAP": 91.5979794205457,
+  "CF1": 83.11791752651968,
+  "OF1": 83.11791752651968
+ },
+ "per_bit_acc": {
+  "candidate": {
+   "llm_textgen": 90.05110188438199
+  },
+  "baseline": {
+   "llm_textgen": 92.55349728521239
+  }
+ },
+ "sources": [
+  {
+   "path": "experiments/plans/E006_t_bertmini_f0.json",
+   "sha256_12": "eb56c6bd5e61"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E006_t_bertmini_f0/results.json",
+   "sha256_12": "ba00e60f56ca"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E006_t_bertmini_f0/test_results.json",
+   "sha256_12": "ef2b355eb50b"
+  },
+  {
+   "path": "experiments/baselines/runs4f/f0/T_base/results.json",
+   "sha256_12": "bae874cee3ff"
+  },
+  {
+   "path": "experiments/baselines/runs4f/f0/T_base/test_results.json",
+   "sha256_12": "d01bd7a4a7bb"
+  }
+ ]
+}

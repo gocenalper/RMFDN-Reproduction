@@ -1,0 +1,84 @@
+{
+  "exp_id": "E006_t_bertmini_f0",
+  "created": "2026-10-01",
+  "baseline": "experiments/baselines/runs4f/f0/T_base/results.json::m1_i3_p2_T",
+  "_baseline_note": "R-MFDN T cell (BERT-base-uncased 110M fine-tuned, mask-weighted mean pool), P2 fold f0, reference-free (i3), visibility-aligned (single visible bit llm_textgen, nkeep=1 so test.mAP == llm AP); BSC $S/runs4f/f0/T_base (5.9 min train, best_val 62.60). Test: ACC 63.45 / AUC 66.86 / mAP 91.60. Ladder so far on this fold: E004 order-blind bag 2.1M -> llm AP 56.81; E005 bag + 2-layer transformer 2.3M -> 75.74.",
+  "factor": {
+    "key": "text_encoder",
+    "baseline_value": "<absent>",
+    "value": "bertmini",
+    "_note": "absent = BERT-base (paper encoder). bertmini = the same TextEncoder (mask-weighted mean pool + Linear 256->512) over prajjwal1/bert-mini (4 layers x 256 hidden, 4 heads, FFN 1024; 11,170,560 encoder params, 11.30M with projection; MLM-pretrained, uncased WordPiece vocab byte-identical to bert-base-uncased so the tokenizer is unchanged), fine-tuned end to end at the same LR. Checkpoint path lives in the environment key bert_mini_model (BSC $S/env/models/bert-mini, pytorch_model.bin md5 83cb6c1bb924adb5c34d7110dfbb840d, from HF hub 2026-10-01)."
+  },
+  "hypothesis": "Language pretraining, not width or depth, closes the remaining gap on the llm_textgen bit: a pretrained 11M BERT-mini fine-tuned like BERT-base reaches f0 test llm AP >= 90.0 (BERT-base 91.60; from-scratch 2-layer transformer 75.74), while staying inside C0's 14-17M total budget; AUC within +-2 of 66.86.",
+  "success_metric": "test.mAP",
+  "_success_note": "test.mAP is exactly llm_textgen AP here (nkeep=1). make_run_report's verdict is strict-sign against BERT-base; the pre-registered gate is watched.llm_textgen >= 90.0 (equivalence). 75.74-90 would mean pretraining helps but capacity also matters -> next rung BERT-small (29M) or distillation from BERT-base.",
+  "expected_direction": "up",
+  "watched": {
+    "test.per_bit_ap.llm_textgen": ">= 90.0 (E005 minitf 75.74, E004 bag 56.81)",
+    "test.AUC": "within +-2.0 of 66.86",
+    "minutes": "expect ~2 (BERT-base 5.9, minitf 1.5)"
+  },
+  "budget": {
+    "iters": 6000,
+    "est_gpu_hours": 0.2,
+    "_note": "BERT-mini forward is ~1/10 of BERT-base"
+  },
+  "spec": {
+    "cross_modal": "m1",
+    "identity": "i3",
+    "protocol": "p2",
+    "modality": "T"
+  },
+  "config": {
+    "attention_heads": 8,
+    "contrastive_dim": 128,
+    "embed_dim": 512,
+    "frame_groups": 4,
+    "frames_per_clip": 16,
+    "image_size": 224,
+    "ast_checkpoint": "/gpfs/scratch/<account>/<user>/env/models/ast",
+    "max_audio_seconds": 8.0,
+    "sample_rate": 16000,
+    "bert_model": "/gpfs/scratch/<account>/<user>/env/models/bert-base-uncased",
+    "max_text_tokens": 50,
+    "backbone_lr_scale": 1.0,
+    "batch_size": 64,
+    "grad_clip_norm": 1.0,
+    "min_lr": 1e-08,
+    "peak_lr": 5e-05,
+    "total_iters": 6000,
+    "lr_schedule_iters": 90000,
+    "bounded_sampler_pristine": null,
+    "warmup_iters": 1000,
+    "warmup_start_lr": 2e-07,
+    "weight_decay": 0.01,
+    "cross_modal_beta": 0.2,
+    "identity_gamma": 0.2,
+    "reference_alpha": 0.001,
+    "temperature": 1.0,
+    "early_stop_patience": 8,
+    "eval_interval": 1500,
+    "log_interval": 100,
+    "num_workers": 16,
+    "seed": 0,
+    "grad_accum_steps": 2,
+    "mask_invisible_bits": true,
+    "mlc_loss": "bce",
+    "skip_test_eval": true,
+    "text_encoder": "bertmini",
+    "bert_mini_model": "/gpfs/scratch/<account>/<user>/env/models/bert-mini"
+  },
+  "launch": {
+    "cluster": "BSC MN5 acc, code $S/code/idforge-final, template experiments/launch/c0_cell.slurm",
+    "flags": "EXP=E006_t_bertmini_f0 FOLD=0 MOD=T EXTRA='--text-encoder bertmini --bert-mini-model /gpfs/scratch/<account>/<user>/env/models/bert-mini' sbatch --export=ALL,EXP,FOLD,MOD,EXTRA experiments/launch/c0_cell.slurm",
+    "job_id": 46856729,
+    "submitted": "2026-10-01"
+  },
+  "status": "done",
+  "results": {
+    "results_json": "experiments/runs/c0/f0/E006_t_bertmini_f0/results.json",
+    "test_eval_json": "experiments/runs/c0/f0/E006_t_bertmini_f0/test_results.json",
+    "_expected": "$S/runs_c0/f0/E006_t_bertmini_f0/{results.json,test_results.json}; pulled to experiments/runs/c0/f0/E006_t_bertmini_f0/ after the run",
+    "bsc_run_dir": "/gpfs/scratch/<account>/<user>/runs_c0/f0/E006_t_bertmini_f0"
+  }
+}

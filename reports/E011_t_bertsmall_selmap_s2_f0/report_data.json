@@ -1,0 +1,68 @@
+{
+ "exp_id": "E011_t_bertsmall_selmap_s2_f0",
+ "generated": "2026-10-01T07:03:24.467431",
+ "git_head": "259df1f",
+ "run_name": "m1_i3_p2_T",
+ "factor": {
+  "key": "seed",
+  "baseline_value": 0,
+  "value": 2,
+  "_note": "Training seed only (init of projection/heads, sampler order, dropout). Encoder weights are the same pretrained BERT-small. Everything else identical to E009."
+ },
+ "baseline": "experiments/plans/E009_t_bertsmall_selmap_f0.json",
+ "success_metric": "test.mAP",
+ "verdict": "NOT SUPPORTED",
+ "delta": -0.24737601740169168,
+ "candidate": {
+  "best_val": 37.7452,
+  "minutes": 2.9,
+  "ACC": 61.14819546470777,
+  "AUC": 58.87165377217016,
+  "mAP": 89.41246838991,
+  "CF1": 80.86494410848452,
+  "OF1": 80.86494410848452
+ },
+ "baseline_metrics": {
+  "best_val": 36.6862,
+  "minutes": 2.7,
+  "ACC": 65.0303417438518,
+  "AUC": 66.54576053438795,
+  "mAP": 89.6598444073117,
+  "CF1": 80.93113918356636,
+  "OF1": 80.93113918356636
+ },
+ "per_bit_acc": {
+  "candidate": {
+   "llm_textgen": 91.6624081763015
+  },
+  "baseline": {
+   "llm_textgen": 91.87639731715107
+  }
+ },
+ "sources": [
+  {
+   "path": "experiments/plans/E011_t_bertsmall_selmap_s2_f0.json",
+   "sha256_12": "21d650782487"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E011_t_bertsmall_selmap_s2_f0/results.json",
+   "sha256_12": "dfad9c7a41a9"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E011_t_bertsmall_selmap_s2_f0/test_results.json",
+   "sha256_12": "a138abb6dc1b"
+  },
+  {
+   "path": "experiments/plans/E009_t_bertsmall_selmap_f0.json",
+   "sha256_12": "7d5d2c97befa"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E009_t_bertsmall_selmap_f0/results.json",
+   "sha256_12": "3ebe727c6357"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E009_t_bertsmall_selmap_f0/test_results.json",
+   "sha256_12": "0b3464795f7c"
+  }
+ ]
+}

@@ -1,0 +1,85 @@
+{
+  "exp_id": "E009_t_bertsmall_selmap_f0",
+  "created": "2026-10-01",
+  "baseline": "experiments/plans/E008_t_bertsmall_eval500_f0.json",
+  "_baseline_note": "E008: BERT-small T cell, f0, seed 0, eval every 500, best checkpoint by val AUC (default). Val AUC peaked at iter 500 (70.14) and decayed monotonically; test llm AP 84.96, below E007's 88.58 whose AUC-selected checkpoint was iter 1500. So val AUC and test llm AP move in opposite directions over training on this cell. Val 7-bit mAP in the E008 log peaked at iter 2000. BERT-base T_base: 91.60.",
+  "factor": {
+    "key": "select_metric",
+    "baseline_value": "<absent>",
+    "value": "mAP",
+    "_note": "absent = trainer default 'AUC' (config.get('select_metric','AUC')). 'mAP' = best checkpoint / early stop by validation 7-bit mAP instead of binary AUC. Six of the seven val bits are invisible to T and near chance, so the val mAP variation is driven by the llm bit; it is a noisy but aligned proxy for the test target. Suite flag --select-metric mAP; same 500-iter grid, LR, iters, patience count as E008."
+  },
+  "hypothesis": "Selecting the checkpoint by val mAP instead of val AUC picks a later, attribution-better checkpoint (around iter 2000 on the E008 grid) and lifts f0 test llm AP above E007's 88.58, target >= 91.0 (BERT-base 91.60): the gap of the small BERTs to BERT-base is a checkpoint-selection artifact, not capacity. AUC may drop toward E007's 67.88 since the early AUC peak is no longer selected.",
+  "success_metric": "test.mAP",
+  "_success_note": "test.mAP == llm_textgen AP (nkeep=1). Verdict is strict-sign vs E008 (84.96); the pre-registered bar is E007's 88.58 and the user's target 91.0. If > 88.58 but < 91.0: selection helps, remaining gap is capacity/LR. If <= 84.96: val 7-bit mAP is too noisy a selector; next would be a visible-bits-only val mAP.",
+  "expected_direction": "up",
+  "watched": {
+    "test.per_bit_ap.llm_textgen": "> 88.58 (E007), target >= 91.0",
+    "best_val_iter": "expected around 2000 (E008 val mAP peak)",
+    "test.AUC": "may fall back toward 67.88 (E007)",
+    "minutes": "expect ~2"
+  },
+  "budget": {
+    "iters": 6000,
+    "est_gpu_hours": 0.2
+  },
+  "spec": {
+    "cross_modal": "m1",
+    "identity": "i3",
+    "protocol": "p2",
+    "modality": "T"
+  },
+  "config": {
+    "attention_heads": 8,
+    "contrastive_dim": 128,
+    "embed_dim": 512,
+    "frame_groups": 4,
+    "frames_per_clip": 16,
+    "image_size": 224,
+    "ast_checkpoint": "/gpfs/scratch/<account>/<user>/env/models/ast",
+    "max_audio_seconds": 8.0,
+    "sample_rate": 16000,
+    "bert_model": "/gpfs/scratch/<account>/<user>/env/models/bert-base-uncased",
+    "max_text_tokens": 50,
+    "backbone_lr_scale": 1.0,
+    "batch_size": 64,
+    "grad_clip_norm": 1.0,
+    "min_lr": 1e-08,
+    "peak_lr": 5e-05,
+    "total_iters": 6000,
+    "lr_schedule_iters": 90000,
+    "bounded_sampler_pristine": null,
+    "warmup_iters": 1000,
+    "warmup_start_lr": 2e-07,
+    "weight_decay": 0.01,
+    "cross_modal_beta": 0.2,
+    "identity_gamma": 0.2,
+    "reference_alpha": 0.001,
+    "temperature": 1.0,
+    "early_stop_patience": 8,
+    "eval_interval": 500,
+    "log_interval": 100,
+    "num_workers": 16,
+    "seed": 0,
+    "grad_accum_steps": 2,
+    "mask_invisible_bits": true,
+    "mlc_loss": "bce",
+    "skip_test_eval": true,
+    "text_encoder": "bertsmall",
+    "bert_small_model": "/gpfs/scratch/<account>/<user>/env/models/bert-small",
+    "select_metric": "mAP"
+  },
+  "launch": {
+    "cluster": "BSC MN5 acc, code $S/code/idforge-final, template experiments/launch/c0_cell.slurm",
+    "flags": "EXP=E009_t_bertsmall_selmap_f0 FOLD=0 MOD=T EVAL=500 EXTRA='--text-encoder bertsmall --bert-small-model /gpfs/scratch/<account>/<user>/env/models/bert-small --select-metric mAP' sbatch --export=ALL,EXP,FOLD,MOD,EVAL,EXTRA experiments/launch/c0_cell.slurm",
+    "job_id": 46859549,
+    "submitted": "2026-10-01"
+  },
+  "status": "done",
+  "results": {
+    "results_json": "experiments/runs/c0/f0/E009_t_bertsmall_selmap_f0/results.json",
+    "test_eval_json": "experiments/runs/c0/f0/E009_t_bertsmall_selmap_f0/test_results.json",
+    "_expected": "$S/runs_c0/f0/E009_t_bertsmall_selmap_f0/{results.json,test_results.json}; pulled after the run",
+    "bsc_run_dir": "/gpfs/scratch/<account>/<user>/runs_c0/f0/E009_t_bertsmall_selmap_f0"
+  }
+}

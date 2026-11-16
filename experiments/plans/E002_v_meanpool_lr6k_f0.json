@@ -1,0 +1,77 @@
+{
+  "exp_id": "E002_v_meanpool_lr6k_f0",
+  "created": "2026-09-30",
+  "baseline": "experiments/plans/E001_v_meanpool_f0.json",
+  "_baseline_note": "E001 (done): C0 visual stream, f0, seed 0, 90k cosine horizon (fold recipe). Test ACC 74.97 / AUC 85.46 / mAP 87.82, face 78.78.",
+  "factor": {
+    "key": "lr_schedule_iters",
+    "baseline_value": 90000,
+    "value": 6000,
+    "_note": "Stage 0 protocol correction: cosine horizon matched to the 6k budget so the LR actually decays inside the run (fold recipe left it at 90k). Same fix as VAT_base_s*_lr6000."
+  },
+  "hypothesis": "Matching the cosine horizon to the 6k budget does not change f0 test mAP(lip,face) by more than seed noise; face_swap AP stays in the E001 band. Stage 0 on VAT: best-val numbers were unchanged by the horizon fix.",
+  "success_metric": "test.mAP",
+  "expected_direction": "up",
+  "watched": {
+    "test.per_bit_ap.face_swap": "vs E001 78.78",
+    "test.AUC": "within +-1.0"
+  },
+  "budget": {
+    "iters": 6000,
+    "est_gpu_hours": 1.0,
+    "_note": "E001: 43 min train + ~10 min test eval, 53 min wall"
+  },
+  "spec": {
+    "cross_modal": "m1",
+    "identity": "i3",
+    "protocol": "p2",
+    "modality": "V"
+  },
+  "config": {
+    "attention_heads": 8,
+    "contrastive_dim": 128,
+    "embed_dim": 512,
+    "frame_groups": 4,
+    "frames_per_clip": 16,
+    "image_size": 224,
+    "ast_checkpoint": "/gpfs/scratch/<account>/<user>/env/models/ast",
+    "max_audio_seconds": 8.0,
+    "sample_rate": 16000,
+    "bert_model": "/gpfs/scratch/<account>/<user>/env/models/bert-base-uncased",
+    "max_text_tokens": 50,
+    "backbone_lr_scale": 1.0,
+    "batch_size": 64,
+    "grad_clip_norm": 1.0,
+    "min_lr": 1e-08,
+    "peak_lr": 5e-05,
+    "total_iters": 6000,
+    "lr_schedule_iters": 6000,
+    "bounded_sampler_pristine": null,
+    "warmup_iters": 1000,
+    "warmup_start_lr": 2e-07,
+    "weight_decay": 0.01,
+    "cross_modal_beta": 0.2,
+    "identity_gamma": 0.2,
+    "reference_alpha": 0.001,
+    "temperature": 1.0,
+    "early_stop_patience": 8,
+    "eval_interval": 1500,
+    "log_interval": 100,
+    "num_workers": 16,
+    "seed": 0,
+    "grad_accum_steps": 2,
+    "mask_invisible_bits": true,
+    "mlc_loss": "bce",
+    "skip_test_eval": true,
+    "no_temporal_transformer": true
+  },
+  "launch": {
+    "cluster": "BSC MN5 acc, code $S/code/idforge-final, template experiments/launch/c0_cell.slurm",
+    "flags": "EXP=E002_v_meanpool_lr6k_f0 FOLD=0 MOD=V EXTRA='--no-temporal-transformer' LRH=6000 sbatch --export=ALL,EXP,FOLD,MOD,EXTRA,LRH experiments/launch/c0_cell.slurm"
+  },
+  "status": "planned",
+  "results": {
+    "results_json": null,
+    "test_eval_json": null
+  }
+}

@@ -1,0 +1,13 @@
+exp_id,date,run_name,factor,baseline,ACC,AUC,mAP,CF1,OF1,best_val,minutes,verdict,report
+E001_v_meanpool_f0,2026-09-30,m1_i3_p2_V,no_temporal_transformer=True,experiments/baselines/runs4f/f0/V_base/results.json::m1_i3_p2_V,74.97,85.46,87.82,80.16,82.84,86.02,43.00,SUPPORTED,reports/E001_v_meanpool_f0/report.pdf
+E003_a_melcnn_f0,2026-09-30,m1_i3_p2_A,audio_encoder=melcnn,experiments/baselines/runs4f/f0/A_base/results.json::m1_i3_p2_A,76.50,85.37,96.69,95.07,95.57,86.97,12.70,NOT SUPPORTED,reports/E003_a_melcnn_f0/report.pdf
+E004_t_embedbag_f0,2026-09-30,m1_i3_p2_T,text_encoder=embedbag,experiments/baselines/runs4f/f0/T_base/results.json::m1_i3_p2_T,67.06,64.41,56.81,44.22,44.22,63.32,0.80,NOT SUPPORTED,reports/E004_t_embedbag_f0/report.pdf
+E005_t_minitf_f0,2026-09-30,m1_i3_p2_T,text_encoder=minitf,experiments/baselines/runs4f/f0/T_base/results.json::m1_i3_p2_T,66.79,67.71,75.74,57.87,57.87,66.83,1.50,NOT SUPPORTED,reports/E005_t_minitf_f0/report.pdf
+E006_t_bertmini_f0,2026-10-01,m1_i3_p2_T,text_encoder=bertmini,experiments/baselines/runs4f/f0/T_base/results.json::m1_i3_p2_T,66.42,70.33,86.96,77.68,77.68,68.76,2.40,NOT SUPPORTED,reports/E006_t_bertmini_f0/report.pdf
+E007_t_bertsmall_f0,2026-10-01,m1_i3_p2_T,text_encoder=bertsmall,experiments/baselines/runs4f/f0/T_base/results.json::m1_i3_p2_T,65.28,67.88,88.58,79.24,79.24,66.36,2.50,NOT SUPPORTED,reports/E007_t_bertsmall_f0/report.pdf
+E008_t_bertsmall_eval500_f0,2026-10-01,m1_i3_p2_T,eval_interval=500,experiments/plans/E007_t_bertsmall_f0.json,66.96,70.65,84.96,74.54,74.54,70.14,1.90,NOT SUPPORTED,reports/E008_t_bertsmall_eval500_f0/report.pdf
+E009_t_bertsmall_selmap_f0,2026-10-01,m1_i3_p2_T,select_metric=mAP,experiments/plans/E008_t_bertsmall_eval500_f0.json,65.03,66.55,89.66,80.93,80.93,36.69,2.70,SUPPORTED,reports/E009_t_bertsmall_selmap_f0/report.pdf
+E010_t_bertsmall_selmap_s1_f0,2026-10-01,m1_i3_p2_T,seed=1,experiments/plans/E009_t_bertsmall_selmap_f0.json,64.22,66.58,89.51,80.92,80.92,41.97,2.70,NOT SUPPORTED,reports/E010_t_bertsmall_selmap_s1_f0/report.pdf
+E011_t_bertsmall_selmap_s2_f0,2026-10-01,m1_i3_p2_T,seed=2,experiments/plans/E009_t_bertsmall_selmap_f0.json,61.15,58.87,89.41,80.86,80.86,37.75,2.90,NOT SUPPORTED,reports/E011_t_bertsmall_selmap_s2_f0/report.pdf
+E012_t_bertsmall_lr2e5_f0,2026-10-01,m1_i3_p2_T,peak_lr=2e-05,experiments/plans/E009_t_bertsmall_selmap_f0.json,65.16,68.68,89.56,80.54,80.54,37.08,2.80,NOT SUPPORTED,reports/E012_t_bertsmall_lr2e5_f0/report.pdf
+E013_t_bertmedium_f0,2026-10-01,m1_i3_p2_T,text_encoder=bertmedium,experiments/plans/E009_t_bertsmall_selmap_f0.json,66.69,70.96,86.92,77.57,77.57,35.61,3.30,NOT SUPPORTED,reports/E013_t_bertmedium_f0/report.pdf

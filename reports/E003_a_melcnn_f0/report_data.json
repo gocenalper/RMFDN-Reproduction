@@ -1,0 +1,66 @@
+{
+ "exp_id": "E003_a_melcnn_f0",
+ "generated": "2026-09-30T21:09:21.188367",
+ "git_head": "259df1f",
+ "run_name": "m1_i3_p2_A",
+ "factor": {
+  "key": "audio_encoder",
+  "baseline_value": "<absent>",
+  "value": "melcnn",
+  "_note": "absent = AST (paper encoder). melcnn = MelCNN in encoders.py: 5 stride-2 conv blocks 32-64-128-256-256 + GAP + Linear->512, 1,110,240 params, from scratch, same 1024x128 AST fbank input. C0's audio stream."
+ },
+ "baseline": "experiments/baselines/runs4f/f0/A_base/results.json::m1_i3_p2_A",
+ "success_metric": "test.mAP",
+ "verdict": "NOT SUPPORTED",
+ "delta": -3.277289486337338,
+ "candidate": {
+  "best_val": 86.9658,
+  "minutes": 12.7,
+  "ACC": 76.49952091983391,
+  "AUC": 85.36897639427352,
+  "mAP": 96.69218359033852,
+  "CF1": 95.07235133028715,
+  "OF1": 95.57178206548966
+ },
+ "baseline_metrics": {
+  "best_val": 84.3874,
+  "minutes": 114.4,
+  "ACC": 65.01916320664324,
+  "AUC": 86.06329201466028,
+  "mAP": 99.96947307667585,
+  "CF1": 99.47529026801234,
+  "OF1": 99.58582604693972
+ },
+ "per_bit_acc": {
+  "candidate": {
+   "tts": 98.24177579048228,
+   "rvc": 97.09996806132226
+  },
+  "baseline": {
+   "tts": 99.97125519003514,
+   "rvc": 99.59757266049185
+  }
+ },
+ "sources": [
+  {
+   "path": "experiments/plans/E003_a_melcnn_f0.json",
+   "sha256_12": "12fe297c112c"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E003_a_melcnn_f0/results.json",
+   "sha256_12": "cbb419d8982a"
+  },
+  {
+   "path": "experiments/runs/c0/f0/E003_a_melcnn_f0/test_results.json",
+   "sha256_12": "c9f03a13665d"
+  },
+  {
+   "path": "experiments/baselines/runs4f/f0/A_base/results.json",
+   "sha256_12": "a91738c7dc42"
+  },
+  {
+   "path": "experiments/baselines/runs4f/f0/A_base/test_results.json",
+   "sha256_12": "3ac6d5e31988"
+  }
+ ]
+}

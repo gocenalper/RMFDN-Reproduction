@@ -1,0 +1,75 @@
+{
+ "m1_i3_p2_T": {
+  "test": {
+   "ACC": 63.45257106355797,
+   "AUC": 66.85758105512934,
+   "mAP": 91.5979794205457,
+   "CF1": 83.11791752651968,
+   "OF1": 83.11791752651968,
+   "nkeep": 1,
+   "metric_implementation": "reference_apmeter",
+   "metric_bits": [
+    "llm_textgen"
+   ],
+   "per_bit_acc": {
+    "llm_textgen": 92.55349728521239
+   },
+   "OP": 82.97072641850379,
+   "OR": 83.2656318003772,
+   "CP": 82.97072641850379,
+   "CR": 83.2656318003772,
+   "per_bit_ap": {
+    "llm_textgen": 91.5979794205457
+   }
+  },
+  "spec": {
+   "cross_modal": "m1",
+   "identity": "i3",
+   "protocol": "p2",
+   "modality": "T"
+  },
+  "config": {
+   "attention_heads": 8,
+   "contrastive_dim": 128,
+   "embed_dim": 512,
+   "frame_groups": 4,
+   "frames_per_clip": 16,
+   "image_size": 224,
+   "ast_checkpoint": "/gpfs/scratch/<account>/<user>/env/models/ast",
+   "max_audio_seconds": 8.0,
+   "sample_rate": 16000,
+   "bert_model": "/gpfs/scratch/<account>/<user>/env/models/bert-base-uncased",
+   "max_text_tokens": 50,
+   "backbone_lr_scale": 1.0,
+   "batch_size": 64,
+   "grad_clip_norm": 1.0,
+   "min_lr": 1e-08,
+   "peak_lr": 5e-05,
+   "total_iters": 6000,
+   "lr_schedule_iters": 90000,
+   "bounded_sampler_pristine": null,
+   "warmup_iters": 1000,
+   "warmup_start_lr": 2e-07,
+   "weight_decay": 0.01,
+   "cross_modal_beta": 0.2,
+   "identity_gamma": 0.2,
+   "reference_alpha": 0.001,
+   "temperature": 1.0,
+   "early_stop_patience": 8,
+   "eval_interval": 1500,
+   "log_interval": 100,
+   "num_workers": 8,
+   "seed": 0,
+   "grad_accum_steps": 2,
+   "mask_invisible_bits": true,
+   "mlc_loss": "bce",
+   "skip_test_eval": true
+  },
+  "checkpoint": {
+   "kind": "best_validation",
+   "path": "/gpfs/scratch/<account>/<user>/runs4f/f0/T_base/runs/m1_i3_p2_T.pt"
+  },
+  "metric_implementation": "reference_apmeter",
+  "metric_scope": "visible_bits_only"
+ }
+}
