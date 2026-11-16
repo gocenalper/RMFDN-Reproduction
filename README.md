@@ -108,8 +108,9 @@ docker compose run --rm smoke python scripts/smoke_test.py --pretrained
 ```bash
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install torch==2.8.0 torchaudio==2.8.0
-pip install -e ".[dev]"
+pip install torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0
+pip install -r requirements.txt
+pip install --no-deps -e .
 
 python -m pytest -q
 python scripts/smoke_test.py
