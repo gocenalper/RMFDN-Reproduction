@@ -40,6 +40,7 @@ from torch.utils.data import DataLoader
 
 from .config import (MANIPULATION_TECHNIQUES, default_device,
                      visible_technique_indices)
+from .corruptions import apply_modality_dropout
 from .data_catalog import ClipRecord
 from .dataset import MultimodalClipDataset, build_collate_fn
 from .evaluation import evaluate
@@ -299,10 +300,26 @@ def run_single_experiment(run_name: str, modalities: Sequence[str], use_referenc
         print(f"[{run_name}] invisible-bit BCE masking ON -- supervised bits="
               f"{[MANIPULATION_TECHNIQUES[i] for i in range(len(MANIPULATION_TECHNIQUES)) if bit_mask[i] > 0]}",
               flush=True)
+    dropout_probability = float(config.get("modality_dropout", 0.0) or 0.0)
+    dropout_generator = torch.Generator().manual_seed(int(config["seed"]) + 7919)
+    dropped = {"audio": 0, "video": 0, "seen": 0}
+    if dropout_probability > 0:
+        print(f"[{run_name}] modality dropout ON: p={dropout_probability} per modality "
+              f"(audio xor video)", flush=True)
+    if config.get("fusion_gate"):
+        print(f"[{run_name}] gated fusion ON", flush=True)
+    if torch.cuda.is_available() and str(device).startswith("cuda"):
+        torch.cuda.reset_peak_memory_stats()
     optimizer.zero_grad()
     while iteration < config["total_iters"] and not stop:
         for batch in train_loader:
             technique_targets = _move_training_batch(batch, device)
+            if dropout_probability > 0:
+                counts = apply_modality_dropout(batch, modalities, dropout_probability,
+                                                dropout_generator)
+                dropped["audio"] += counts["audio"]
+                dropped["video"] += counts["video"]
+                dropped["seen"] += int(batch["is_fake"].shape[0])
 
             with (torch.amp.autocast("cuda", enabled=str(device).startswith("cuda"))
                   if hasattr(torch.amp, "autocast")
@@ -420,6 +437,16 @@ def run_single_experiment(run_name: str, modalities: Sequence[str], use_referenc
         if os.path.exists(stale):
             os.remove(stale)
     minutes = (time.time() - start_time) / 60
+    resources = {
+        "trainable_parameters": int(sum(p.numel() for p in model.parameters()
+                                        if p.requires_grad)),
+        "peak_memory_gb": (round(torch.cuda.max_memory_allocated() / 1024 ** 3, 2)
+                           if torch.cuda.is_available() and str(device).startswith("cuda")
+                           else None),
+        "iterations": iteration,
+    }
+    if dropout_probability > 0:
+        resources["modality_dropout_counts"] = dropped
 
     if skip_test_eval:
         # Train-only phase: the held-out test split is not extracted yet.
@@ -431,6 +458,7 @@ def run_single_experiment(run_name: str, modalities: Sequence[str], use_referenc
                 "train_fake": num_fake, "train_real": num_real,
                 "techniques": MANIPULATION_TECHNIQUES,
                 "config": dict(config),
+                "resources": resources,
                 "minutes": round(minutes, 1)}
 
     test_metrics = _evaluate_test_split(
@@ -444,4 +472,5 @@ def run_single_experiment(run_name: str, modalities: Sequence[str], use_referenc
             "train_fake": num_fake, "train_real": num_real,
             "techniques": MANIPULATION_TECHNIQUES,
             "config": dict(config),
+            "resources": resources,
             "minutes": round(minutes, 1)}

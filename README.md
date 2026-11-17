@@ -8,9 +8,9 @@
 ![Python](https://img.shields.io/badge/python-3.9%2B-2B6CB0?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.8-2E3B4E?logo=pytorch&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-CPU%20%7C%20GPU-4E9A88?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-38%20unit%20%2B%20end--to--end-4E9A88)
+![Tests](https://img.shields.io/badge/tests-49%20unit%20%2B%20end--to--end-4E9A88)
 
-[Quick start](#quick-start) · [Results](#results) · [Train on IDForge](#train-on-idforge) · [What differs from the paper](#what-differs-from-the-paper) · [Repository layout](#repository-layout)
+[Quick start](#quick-start) · [Results](#results) · [Train on IDForge](#train-on-idforge) · [Improvement experiment](#improvement-experiment-gated-fusion-and-modality-dropout) · [What differs from the paper](#what-differs-from-the-paper) · [Repository layout](#repository-layout)
 
 </div>
 
@@ -89,13 +89,15 @@ docker compose run --rm results   # 3. print the results tables below
 The first command builds the CPU image (about five minutes). No dataset, GPU or
 model download is involved in any of the three.
 
-**What the smoke test proves.** It writes 48 synthetic clips in the IDForge
+**What the smoke test proves.** It writes 60 synthetic clips in the IDForge
 directory layout, trains two cells for two optimizer steps each (video + audio + text
 with the identity reference, and video + audio without it), saves
 checkpoints, scores the test split, then reloads every checkpoint through the
-evaluation script and checks that the scores match. It uses small randomly
-initialised encoders so it finishes in about a minute; the numbers it prints are
-meaningless by design. Add `--pretrained` to run the same check with the real
+evaluation script and checks that the scores match. It then runs the whole
+improvement pipeline: the four VA arms for two seeds, scoring under all seven
+test conditions, the resource measurement and the analysis tables. It uses
+small randomly initialised encoders so it finishes in about two minutes; the
+numbers it prints are meaningless by design. Add `--pretrained` to run the same check with the real
 ResNet-18, AST and BERT weights (roughly 1 GB download, cached in a Docker volume):
 
 ```bash
@@ -223,7 +225,7 @@ python scripts/run_experiment_suite.py \
   --data-root /data/idforge --reference-root /data/idforge_ref \
   --p2-split protocol_p2/fold_F0.json \
   --output-dir /out \
-  --iters 6000 --lr-schedule-iters 90000 \
+  --iters 6000 --lr-schedule-iters 6000 \
   --eval-interval 1500 --patience 8 \
   --batch-size 64 --grad-accum-steps 2 --num-workers 8 \
   --mask-invisible-bits --skip-test-eval
@@ -231,7 +233,7 @@ python scripts/run_experiment_suite.py \
 
 | Option | Meaning |
 |---|---|
-| `--iters` / `--lr-schedule-iters` | Steps to run / length of the cosine schedule. The paper uses 90,000 for both |
+| `--iters` / `--lr-schedule-iters` | Steps to run / length of the cosine schedule. The reported runs use 6,000 for both; the paper uses 90,000 |
 | `--batch-size` × `--grad-accum-steps` | Effective batch size (64 × 2 = 128) at the memory cost of one micro-batch |
 | `--mask-invisible-bits` | Supervise the technique head only on techniques the cell's modalities can observe (VA: the two text techniques are left out; VAT: no effect) |
 | `--select-metric {AUC,ACC,mAP}` | Validation metric that picks the best checkpoint (default AUC) |
@@ -269,6 +271,59 @@ sbatch --account=<account> --export=ALL,MOD=VAT,WORK=/path/to/workdir scripts/sl
 
 </details>
 
+## Improvement experiment: gated fusion and modality dropout
+
+With one token per modality, the VA fusion is `LayerNorm(a + ṽ)`: a fixed sum
+of the audio feature and the attended visual feature, with no way to lower the
+weight of an unreliable stream. The intervention (report Section 5) has two
+parts that can be switched on separately:
+
+| Part | What it does | Where |
+|---|---|---|
+| Gate | `LayerNorm(z ⊙ a + (1 − z) ⊙ ṽ)`, `z = σ(W [a, ṽ] + b)`; one extra 1024 → 512 linear layer. `z = 0.5` reproduces the baseline exactly | `rmfdn_ablation/RMFDN.py` |
+| Modality dropout | During training each clip loses its audio (zero log-mel) with p = 0.1 and, separately, its video (black frames) with p = 0.1, never both; labels unchanged | `rmfdn_ablation/corruptions.py`, `trainer.py` |
+
+Four arms, VA on the official split without the reference, three seeds each
+([`experiments/improvement_matrix.json`](experiments/improvement_matrix.json)):
+
+| Arm (`variant`) | Gate | Dropout | Role |
+|---|:-:|:-:|---|
+| `base` | | | Reproduced baseline and control |
+| `dropout` | | ✓ | Ablation: training exposure only |
+| `gate` | ✓ | | Ablation: architecture only |
+| `gate_dropout` | ✓ | ✓ | Proposed method |
+
+Test conditions, applied to the test clips only, with fixed seeds so every
+arm sees the same corrupted inputs (`rmfdn_ablation/corruptions.py`):
+`clean`, `audio_missing` (zero log-mel), `audio_noise_10db` and
+`audio_noise_0db` (white noise added to the waveform), `audio_mismatch` (audio
+of another test clip, a fixed derangement), `video_blur` (Gaussian, σ = 3) and
+`video_missing` (black frames).
+
+**No results yet.** The twelve training runs need the licensed dataset and
+about 70 GPU-hours; the smoke test runs the same code on synthetic clips.
+
+```bash
+# 1. train the four arms for one seed (repeat with RMFDN_SEED=1 and 2)
+RMFDN_SEED=0 docker compose run --rm train-improvement
+# 2. score best-validation checkpoints under all seven conditions
+RMFDN_SEED=0 docker compose run --rm robustness
+# 3. parameters and latency per arm (batch 16, ms per clip)
+python scripts/measure_resources.py --output results/improvement/resources.json
+# 4. tables (mean ± std, paired bootstrap, forgery groups, gate values) and figure
+python scripts/analyze_improvement.py \
+  --suites $RMFDN_OUTPUT/improvement_s0 $RMFDN_OUTPUT/improvement_s1 $RMFDN_OUTPUT/improvement_s2 \
+  --resources results/improvement/resources.json \
+  --output results/improvement/analysis.md --plot docs/improvement.svg
+```
+
+On Slurm, [`scripts/slurm/train_improvement.slurm`](scripts/slurm/train_improvement.slurm)
+trains one arm for one seed and scores both its best-validation and its final
+checkpoint; the header shows the loop that submits all twelve jobs. The
+trainer records peak GPU memory and training time in each run's
+`results.json`. Validation runs every 500 steps and the test split is never
+used to choose anything.
+
 ## What differs from the paper
 
 | | Paper | This repository (reported runs) |
@@ -303,15 +358,19 @@ rmfdn_ablation/            the package
 ├── reference.py           identity-reference path
 ├── protocols.py           official and identity-disjoint splits
 ├── trainer.py             one training run: schedule, AMP, checkpoints, early stop
+├── corruptions.py         modality dropout and the seven test-time conditions
 ├── evaluation.py          detection and attribution metrics
 └── experiment.py          experiment matrix expansion and sequencing
 scripts/
 ├── run_experiment_suite.py   train the cells of a matrix
 ├── run_test_eval.py          score trained checkpoints on the test split
+├── run_corruption_eval.py    score them under the seven test conditions
+├── measure_resources.py      parameters and latency per arm
+├── analyze_improvement.py    improvement tables, bootstrap intervals and figure
 ├── smoke_test.py             end-to-end check on synthetic clips
-├── summarize_results.py      results tables and figure
-└── slurm/train_cell.slurm    cluster recipe
-experiments/experiment_matrix.json   the declared cells
+├── summarize_results.py      reproduction tables and figure
+└── slurm/                    cluster recipes (reproduction cell, improvement arm)
+experiments/               reproduction and improvement matrices
 protocol_p2/               identity-disjoint split files and their generator
 results/                   stored metrics and configurations of the reported runs
 tests/                     unit tests

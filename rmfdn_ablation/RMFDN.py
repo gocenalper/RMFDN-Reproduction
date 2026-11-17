@@ -11,6 +11,13 @@ Architecture (mirroring the paper's end-to-end setup):
   text token cross-attends into audio, the result cross-attends into visual.
   With two modalities a single cross-attention is used (text, else audio, is
   the query). A single modality passes through self-attention + FFN only.
+* **Gated fusion** (optional, ``config["fusion_gate"]``; report Section 5) --
+  in the two-modality path the fixed residual sum ``a + v~`` is replaced by
+  ``z * a + (1 - z) * v~`` with ``z = sigmoid(W_z [a, v~] + b_z)``, a
+  per-dimension, input-dependent gate (Gated Multimodal Unit style). The
+  following LayerNorm removes the overall scale, so ``z = 0.5`` reproduces the
+  baseline exactly. The mean gate value per clip is returned as
+  ``outputs["gate"]`` for analysis.
 * **Heads** -- two *parallel* linear heads on the fused feature:
 
       binary_head     Linear(d, 2)            -> real / fake decision
@@ -79,6 +86,9 @@ class RMFDN(nn.Module):
             self.fusion_ffn = nn.Sequential(
                 nn.Linear(embed_dim, embed_dim * 4), nn.GELU(), nn.Linear(embed_dim * 4, embed_dim))
             self.output_norm = nn.LayerNorm(embed_dim)
+            self.use_gate = bool(config.get("fusion_gate", False))
+            if self.use_gate:
+                self.fusion_gate = nn.Linear(2 * embed_dim, embed_dim)
 
         # ----- output heads (parallel, both read the fused feature) ----------
         self.binary_head = nn.Linear(embed_dim, 2)
@@ -108,6 +118,7 @@ class RMFDN(nn.Module):
 
     def fuse(self, features: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Progressive fusion into a single ``(B, embed_dim)`` clip feature."""
+        self.last_gate = None
         if len(self.modalities) == 1:
             return features[self.modalities[0]]
 
@@ -127,7 +138,14 @@ class RMFDN(nn.Module):
             key_modality = [m for m in self.modalities if m != query_modality][0]
             attended, _ = self.cross_attention(
                 tokens[query_modality], tokens[key_modality], tokens[key_modality])
-            fused = self.attention_norm(tokens[query_modality] + attended)
+            if getattr(self, "use_gate", False):
+                query_token = tokens[query_modality]
+                gate = torch.sigmoid(self.fusion_gate(
+                    torch.cat([query_token, attended], dim=-1)))
+                self.last_gate = gate.squeeze(1).mean(dim=-1)        # (B,)
+                fused = self.attention_norm(gate * query_token + (1 - gate) * attended)
+            else:
+                fused = self.attention_norm(tokens[query_modality] + attended)
             return self.output_norm(fused + self.fusion_ffn(fused)).squeeze(1)
 
         raise RuntimeError(f"unsupported modality configuration: {self.modalities}")
@@ -154,6 +172,8 @@ class RMFDN(nn.Module):
         features = self.encode_modalities(batch)
         fused = self.fuse(features)
         outputs: Dict[str, torch.Tensor] = {"fused": fused}
+        if self.last_gate is not None:
+            outputs["gate"] = self.last_gate
         for modality in self.modalities:
             outputs[f"contrastive_{modality}"] = self.contrastive_projections[modality](
                 features[modality])

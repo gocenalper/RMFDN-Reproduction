@@ -26,6 +26,8 @@ from typing import Callable, Dict, List, Optional, Sequence
 import torch
 from torch.utils.data import Dataset
 
+from .corruptions import (blank_audio, blank_frames, blur_frames, clip_seed, condition,
+                          mismatch_permutation)
 from .data_catalog import ClipRecord, clip_basename
 from .media_io import load_ast_input, load_frame_tensor, load_transcript
 
@@ -35,12 +37,19 @@ class MultimodalClipDataset(Dataset):
 
     def __init__(self, clips: Sequence[ClipRecord], modalities: Sequence[str], config: dict,
                  reference_index: Optional[Dict[str, List[str]]] = None,
-                 reference_seed: Optional[int] = None):
+                 reference_seed: Optional[int] = None,
+                 corruption: Optional[str] = None, corruption_seed: int = 0):
         self.clips = list(clips)
         self.modalities = list(modalities)
         self.config = config
         self.reference_index = reference_index
         self.reference_seed = reference_seed
+        # Test-time corruption (see corruptions.CONDITIONS); applied to the
+        # clip under test only, never to its identity reference.
+        self.corruption = condition(corruption or "clean")
+        self.corruption_seed = corruption_seed
+        self.audio_source = (mismatch_permutation(len(self.clips), corruption_seed)
+                             if self.corruption["audio"] == "mismatch" else None)
 
     def __len__(self) -> int:
         return len(self.clips)
@@ -53,13 +62,25 @@ class MultimodalClipDataset(Dataset):
             "identity": clip.identity,
         }
         if "v" in self.modalities:
-            sample["frames"] = load_frame_tensor(clip.directory, self.config)
+            frames = load_frame_tensor(clip.directory, self.config)
+            if self.corruption["video"] == "missing":
+                frames = blank_frames(frames)
+            elif self.corruption["video"] == "blur":
+                frames = blur_frames(frames, self.corruption["sigma"])
+            sample["frames"] = frames
         else:
             sample["frames"] = torch.zeros(1)
-        sample["mel"] = (
-            load_ast_input(clip.directory, clip.basename, self.config)
-            if "a" in self.modalities else torch.zeros(1)
-        )
+        if "a" in self.modalities:
+            audio_kind = self.corruption["audio"]
+            audio_clip = (self.clips[self.audio_source[index]]
+                          if audio_kind == "mismatch" else clip)
+            mel = load_ast_input(
+                audio_clip.directory, audio_clip.basename, self.config,
+                noise_snr_db=self.corruption.get("snr_db") if audio_kind == "noise" else None,
+                noise_seed=clip_seed(clip.directory, self.corruption_seed))
+            sample["mel"] = blank_audio(mel) if audio_kind == "missing" else mel
+        else:
+            sample["mel"] = torch.zeros(1)
         sample["transcript"] = (
             load_transcript(clip.directory, clip.basename)
             if "t" in self.modalities else ""

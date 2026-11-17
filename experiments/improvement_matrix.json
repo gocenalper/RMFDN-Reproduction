@@ -1,0 +1,7 @@
+{
+  "description": "Improvement experiment of the report (Sections 5 and 6): VA, official split (p1), identity reference off (i3), four arms. Run once per seed (0, 1, 2) with --seed and a separate --output-dir per seed. base = reproduced baseline and control; dropout and gate = single-factor ablations; gate_dropout = proposed method.",
+  "cells": [
+    {"cross_modal": "m1", "identity": "i3", "protocol": "p1", "modalities": ["VA"],
+     "variants": ["base", "dropout", "gate", "gate_dropout"]}
+  ]
+}

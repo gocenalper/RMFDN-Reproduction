@@ -130,11 +130,26 @@ DEFAULT_CONFIG: Dict = dict(
     # --- evaluation & early stopping ---------------------------------------- #
     early_stop_patience=10,        # stop after N non-improving validations
     eval_interval=1000,            # validation every N iterations
+    # --- improvement experiment (report Section 5) --------------------------- #
+    fusion_gate=False,             # learned gate instead of the fixed residual sum
+    modality_dropout=0.0,          # per-sample probability of blanking audio,
+                                   # and separately video, during training
     # --- runtime -------------------------------------------------------------- #
     log_interval=100,
     num_workers=8,
     seed=0,
 )
+
+
+#: Arms of the improvement experiment (report Section 6). Each arm is a set of
+#: configuration overrides applied on top of the shared training recipe. The
+#: two single-factor arms are the ablations that isolate each component.
+VARIANTS: Dict[str, Dict] = {
+    "base": {},
+    "dropout": {"modality_dropout": 0.1},
+    "gate": {"fusion_gate": True},
+    "gate_dropout": {"fusion_gate": True, "modality_dropout": 0.1},
+}
 
 
 def default_device() -> str:

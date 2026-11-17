@@ -2,7 +2,7 @@
 # Train one matrix cell on a Slurm cluster through Singularity/Apptainer, then
 # score its best-validation checkpoint on the test split. This is the recipe
 # behind the numbers in results/ (6,000 optimizer steps, effective batch 128,
-# cosine schedule laid out for 90,000 steps, one GPU).
+# cosine schedule over the same 6,000 steps, one GPU).
 #
 # Usage:
 #   sbatch --account=<account> --export=ALL,MOD=VAT,WORK=/path/to/workdir \
@@ -44,7 +44,7 @@ run python scripts/run_experiment_suite.py \
   --data-root "$WORK/data/idforge" --reference-root "$WORK/data/idforge_ref" \
   --output-dir "$RUN" \
   --bert-model "$WORK/models/bert-base-uncased" --ast-checkpoint "$WORK/models/ast" \
-  --iters 6000 --lr-schedule-iters 90000 --eval-interval 1500 --patience 8 \
+  --iters 6000 --lr-schedule-iters 6000 --eval-interval 1500 --patience 8 \
   --batch-size 64 --grad-accum-steps 2 --num-workers 16 --seed "$SEED" \
   --mask-invisible-bits --skip-test-eval
 

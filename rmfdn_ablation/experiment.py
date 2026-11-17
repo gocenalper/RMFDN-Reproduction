@@ -5,10 +5,12 @@ A run is one cell of the matrix, defined by
 * **protocol**    -- ``p1`` (official IDForge split) or ``p2`` (identity-disjoint),
 * **identity**    -- ``i1`` (identity reference on) or ``i3`` (reference off),
 * **cross_modal** -- always ``m1``, the R-MFDN progressive cross-attention fusion,
-* **modality**    -- any non-empty subset of visual / audio / text.
+* **modality**    -- ``VA`` or ``VAT``,
+* **variant**     -- arm of the improvement experiment (``base``, ``dropout``,
+  ``gate``, ``gate_dropout``; see ``config.VARIANTS``), default ``base``.
 
-and named ``<cross_modal>_<identity>_<protocol>_<modality>``, for example
-``m1_i1_p1_VAT``. The matrix is declared as data (see
+and named ``<cross_modal>_<identity>_<protocol>_<modality>[_<variant>]``, for
+example ``m1_i1_p1_VAT`` or ``m1_i3_p1_VA_gate_dropout``. The matrix is declared as data (see
 ``experiments/experiment_matrix.json``), so a new setup needs no code change.
 :func:`run_experiment_sequence` executes the declared specs in order and can
 be relaunched: finished runs are skipped.
@@ -22,7 +24,7 @@ import traceback
 from dataclasses import asdict, dataclass
 from typing import Dict, List, Optional
 
-from .config import MODALITY_CONFIGS, default_device
+from .config import MODALITY_CONFIGS, VARIANTS, default_device
 from .protocols import build_protocol_splits
 from .trainer import run_single_experiment
 
@@ -41,20 +43,25 @@ class ExperimentSpec:
     identity: str      # 'i1' | 'i3'
     protocol: str      # 'p1' | 'p2'
     modality: str      # 'VA' | 'VAT'
+    variant: str = "base"
 
     @property
     def name(self) -> str:
-        return f"{self.cross_modal}_{self.identity}_{self.protocol}_{self.modality}"
+        name = f"{self.cross_modal}_{self.identity}_{self.protocol}_{self.modality}"
+        return name if self.variant == "base" else f"{name}_{self.variant}"
 
 
 def expand_cells(cells: List[dict]) -> List[ExperimentSpec]:
     """Expand declarative cells (each listing several modalities) into specs."""
     specs: List[ExperimentSpec] = []
     for cell in cells:
-        for modality in cell["modalities"]:
-            specs.append(ExperimentSpec(
-                cross_modal=cell["cross_modal"], identity=cell["identity"],
-                protocol=cell["protocol"], modality=modality))
+        for variant in cell.get("variants", ["base"]):
+            if variant not in VARIANTS:
+                raise ValueError(f"unknown variant {variant!r}; choose from {list(VARIANTS)}")
+            for modality in cell["modalities"]:
+                specs.append(ExperimentSpec(
+                    cross_modal=cell["cross_modal"], identity=cell["identity"],
+                    protocol=cell["protocol"], modality=modality, variant=variant))
     return specs
 
 
@@ -122,11 +129,15 @@ def run_experiment_sequence(specs: List[ExperimentSpec], config: dict,
             val_clips = random.Random(0).sample(val_clips, val_cap)
 
         print(f"\n{'=' * 70}\nRUN {spec.name}\n{'=' * 70}", flush=True)
+        run_config = {**config, **VARIANTS[spec.variant]}
+        if run_config.get("fusion_gate") and len(modalities) != 2:
+            print(f"[{spec.name}] FAILED: the fusion gate is defined for VA only", flush=True)
+            continue
         try:
             run_result = run_single_experiment(
                 spec.name, modalities, use_reference,
                 train_clips, val_clips, splits["test"],
-                reference_index, tokenizer, config, output_dir, device,
+                reference_index, tokenizer, run_config, output_dir, device,
                 skip_test_eval=config.get("skip_test_eval", False))
             run_result["spec"] = asdict(spec)
             results[spec.name] = run_result

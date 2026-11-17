@@ -7,10 +7,15 @@ bank), then runs the two real entry points on it:
 
 1. ``run_experiment_sequence`` -- trains a few optimizer steps per cell,
    validates, checkpoints and scores the test split;
-2. ``scripts/run_test_eval.py`` -- reloads every checkpoint and re-scores it.
+2. ``scripts/run_test_eval.py`` -- reloads every checkpoint and re-scores it;
+3. the improvement experiment: the four VA arms (baseline, modality dropout,
+   gated fusion, both) for two seeds, ``scripts/run_corruption_eval.py`` on
+   all seven test conditions, ``scripts/measure_resources.py`` and
+   ``scripts/analyze_improvement.py`` on the outputs.
 
-It exercises data loading, the fusion model for three, two and one
-modalities, the identity-reference path (i1), both split protocols (p1, p2),
+It exercises data loading, the fusion model for three and two
+modalities, the gate, modality dropout and every test-time corruption,
+the identity-reference path (i1), both split protocols (p1, p2),
 the losses, the checkpoint logic and the metrics. The numbers it prints are meaningless: the
 clips are random noise. It only proves that the pipeline runs.
 
@@ -39,9 +44,10 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import numpy as np
 
 #: Forgery types written to the synthetic dataset. Together they switch every
-#: one of the seven technique bits on and off at least once.
+#: one of the seven technique bits on and off at least once, and include an
+#: audio-only forgery for the visible/audio-only split of the analysis.
 SMOKE_TYPES = ("pristine", "face_tts_textgen", "lip_rvc_textmismatch",
-               "face_audiomismatch_textmismatch")
+               "face_audiomismatch_textmismatch", "tts_textmismatch")
 
 #: identity -> split used for the identity-disjoint (p2) cell.
 P2_ASSIGNMENT = {"train": ["id01", "id02"], "val": ["id03"], "test": ["id04"]}
@@ -127,6 +133,71 @@ def _check_metrics(name: str, metrics: dict) -> None:
             raise AssertionError(f"{name}: metric {key} is not a finite percentage: {value!r}")
 
 
+def run_improvement_pipeline(root: Path, paths: dict, config: dict, iters: int) -> int:
+    """Train the four VA arms for two seeds and run the robustness tooling."""
+    import run_corruption_eval
+    import analyze_improvement
+    from measure_resources import measure
+
+    from rmfdn_ablation.config import VARIANTS
+    from rmfdn_ablation.corruptions import CONDITIONS
+    from rmfdn_ablation.experiment import expand_cells, run_experiment_sequence
+
+    cells = json.loads((REPO_ROOT / "experiments" / "improvement_matrix.json").read_text())["cells"]
+    specs = expand_cells(cells)
+    suites = []
+    for seed in (0, 1):
+        suite = root / "improvement" / f"seed{seed}"
+        # 64 x 64 frames (the synthetic clips' own size) keep the 2 seeds x 4 arms
+        # x 7 conditions affordable on a laptop CPU
+        seed_config = {**config, "seed": seed, "final_eval": True, "image_size": 64}
+        results = run_experiment_sequence(specs, seed_config, paths["data_root"],
+                                          paths["reference_root"], str(suite))
+        for spec in specs:
+            if spec.name not in results:
+                raise AssertionError(f"{spec.name} (seed {seed}): training failed")
+            saved = results[spec.name]["config"]
+            expected = VARIANTS[spec.variant]
+            for key, value in expected.items():
+                if saved.get(key) != value:
+                    raise AssertionError(f"{spec.name}: {key}={saved.get(key)!r}, expected {value!r}")
+        sys.argv = ["run_corruption_eval.py", "--phase1-dir", str(suite),
+                    "--data-root", paths["data_root"], "--reference-root", paths["reference_root"],
+                    "--output", str(suite / "corruption_results.json"),
+                    "--dump-scores", str(suite / "scores")]
+        run_corruption_eval.main()
+        scored = json.loads((suite / "corruption_results.json").read_text())
+        for spec in specs:
+            conditions = scored[spec.name]["conditions"]
+            if set(conditions) != set(CONDITIONS):
+                raise AssertionError(f"{spec.name}: missing conditions {set(CONDITIONS) - set(conditions)}")
+            for name, metrics in conditions.items():
+                _check_metrics(f"{spec.name} [{name}]", metrics)
+            if "gate" in spec.variant and "gate_mean" not in conditions["clean"]:
+                raise AssertionError(f"{spec.name}: gate values were not recorded")
+        suites.append(str(suite))
+
+    resources = {variant: measure({**config, **overrides, "image_size": 64}, batch_size=2,
+                                  repeats=2, warmup=1,
+                                  device="cpu")
+                 for variant, overrides in VARIANTS.items()}
+    if not resources["gate"]["gate_parameters"] or resources["base"]["gate_parameters"]:
+        raise AssertionError("gate parameters are not counted as expected")
+    resources_path = root / "improvement" / "resources.json"
+    resources_path.write_text(json.dumps(resources))
+
+    analysis_path = root / "improvement" / "analysis.md"
+    sys.argv = ["analyze_improvement.py", "--suites", *suites, "--resources",
+                str(resources_path), "--bootstrap", "20", "--output", str(analysis_path)]
+    analyze_improvement.main()
+    analysis = analysis_path.read_text()
+    for heading in ("AUC by condition", "Paired difference", "audio-only", "Gate values",
+                    "Unfavourable"):
+        if heading not in analysis:
+            raise AssertionError(f"analysis output lacks the {heading!r} section")
+    return len(specs) * len(suites)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--pretrained", action="store_true",
@@ -202,8 +273,12 @@ def main() -> int:
                     f"{spec.name}: test AUC changed after reloading the checkpoint "
                     f"({first:.4f} -> {second:.4f})")
 
-        print(f"\n[smoke] OK: {len(specs)} cells trained, checkpointed, "
-              f"evaluated and re-evaluated from disk.", flush=True)
+        # Third part: the improvement experiment on the same synthetic data.
+        improvement_runs = run_improvement_pipeline(root, paths, config, args.iters)
+
+        print(f"\n[smoke] OK: {len(specs)} reproduction cells trained, checkpointed, "
+              f"evaluated and re-evaluated from disk; {improvement_runs} improvement runs "
+              f"trained, scored under every test condition and analysed.", flush=True)
         return 0
     finally:
         if not args.keep:

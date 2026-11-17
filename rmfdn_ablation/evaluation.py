@@ -118,6 +118,7 @@ def evaluate(model, dataset: MultimodalClipDataset, tokenizer, config: dict,
 
     fake_scores, fake_labels = [], []
     technique_scores, technique_labels = [], []
+    gate_values = []
     for batch in loader:
         keys = ["frames", "mel", "input_ids", "attention_mask"]
         if "reference_frames" in batch:
@@ -144,6 +145,8 @@ def evaluate(model, dataset: MultimodalClipDataset, tokenizer, config: dict,
             technique_scores.append(
                 torch.sigmoid(outputs["technique_logits"].float()).cpu().numpy())
         technique_labels.append(batch["technique_targets"].numpy())
+        if "gate" in outputs:
+            gate_values.append(outputs["gate"].float().cpu().numpy())
     model.train()
 
     fake_scores = np.concatenate(fake_scores)
@@ -211,4 +214,6 @@ def evaluate(model, dataset: MultimodalClipDataset, tokenizer, config: dict,
             "fake_scores": fake_scores.astype(np.float32),
             "fake_labels": fake_labels.astype(np.uint8),
         }
+        if gate_values:
+            metrics["_arrays"]["gate"] = np.concatenate(gate_values).astype(np.float32)
     return metrics

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Optional
 
 import numpy as np
 import torch
@@ -132,12 +133,17 @@ def _warn_undecodable_audio(path: str, error: Exception) -> None:
               file=sys.stderr, flush=True)
 
 
-def load_ast_input(clip_directory: str, basename: str, config: dict) -> torch.Tensor:
+def load_ast_input(clip_directory: str, basename: str, config: dict,
+                   noise_snr_db: Optional[float] = None,
+                   noise_seed: int = 0) -> torch.Tensor:
     """Load audio as pretrained-AST ``input_values`` ``(1024, 128)``.
 
     Uses the model's own ``ASTFeatureExtractor`` (kaldi fbank, 128 mel bins,
     AudioSet normalisation). Missing/unreadable audio degrades to a silent
     all-zero tensor of the same shape so one broken file cannot abort a run.
+
+    ``noise_snr_db`` adds white noise to the waveform at that signal-to-noise
+    ratio before the filterbank (test-time corruption, seeded by ``noise_seed``).
     """
     global _AST_EXTRACTOR
     import torchaudio
@@ -166,6 +172,9 @@ def load_ast_input(clip_directory: str, basename: str, config: dict) -> torch.Te
     if sample_rate != config["sample_rate"]:
         waveform = torchaudio.functional.resample(waveform, sample_rate, config["sample_rate"])
     waveform = waveform[:, : int(config["max_audio_seconds"] * config["sample_rate"])]
+    if noise_snr_db is not None:
+        from .corruptions import add_white_noise
+        waveform = add_white_noise(waveform, noise_snr_db, noise_seed)
     features = _AST_EXTRACTOR(waveform.squeeze(0).numpy(), sampling_rate=config["sample_rate"],
                               return_tensors="pt")
     audio = features["input_values"].squeeze(0)            # (T, 128)
