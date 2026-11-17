@@ -92,49 +92,30 @@ class MultimodalClipDataset(Dataset):
 
 def build_collate_fn(tokenizer, config: dict) -> Callable[[List[dict]], dict]:
     """Collate that stacks tensors and BERT-tokenises the transcripts.
-
-    ``config["blank_modalities"]`` (subset of "vat") replaces those modalities'
-    raw inputs with constants -- black frames, zero mel, empty transcript --
-    while the model keeps its full (VAT) graph. Applies identically to the
-    main and reference clips, in training and evaluation alike.
     """
-    blank = set(config.get("blank_modalities") or "")
 
     def collate(batch: List[dict]) -> dict:
-        frames = torch.stack([sample["frames"] for sample in batch])
-        mel = torch.stack([sample["mel"] for sample in batch])
-        if "v" in blank:
-            frames = torch.zeros_like(frames)
-        if "a" in blank:
-            mel = torch.zeros_like(mel)
         collated = {
-            "frames": frames,
-            "mel": mel,
+            "frames": torch.stack([sample["frames"] for sample in batch]),
+            "mel": torch.stack([sample["mel"] for sample in batch]),
             "is_fake": torch.tensor([sample["is_fake"] for sample in batch], dtype=torch.long),
             "technique_targets": torch.stack([sample["technique_targets"] for sample in batch]),
             "identity": [sample["identity"] for sample in batch],
         }
         encoded = tokenizer(
-            ["" if "t" in blank else sample["transcript"] for sample in batch],
+            [sample["transcript"] for sample in batch],
             padding="max_length", truncation=True,
             max_length=config["max_text_tokens"], return_tensors="pt",
         )
         collated["input_ids"] = encoded["input_ids"]
         collated["attention_mask"] = encoded["attention_mask"]
         if "reference_frames" in batch[0]:
-            reference_frames = torch.stack(
+            collated["reference_frames"] = torch.stack(
                 [sample["reference_frames"] for sample in batch])
-            reference_mel = torch.stack(
+            collated["reference_mel"] = torch.stack(
                 [sample["reference_mel"] for sample in batch])
-            if "v" in blank:
-                reference_frames = torch.zeros_like(reference_frames)
-            if "a" in blank:
-                reference_mel = torch.zeros_like(reference_mel)
-            collated["reference_frames"] = reference_frames
-            collated["reference_mel"] = reference_mel
             reference_encoded = tokenizer(
-                ["" if "t" in blank else sample["reference_transcript"]
-                 for sample in batch],
+                [sample["reference_transcript"] for sample in batch],
                 padding="max_length", truncation=True,
                 max_length=config["max_text_tokens"], return_tensors="pt",
             )

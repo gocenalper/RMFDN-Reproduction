@@ -82,11 +82,10 @@ def visible_technique_indices(modalities: Sequence[str]) -> Tuple[int, ...]:
     return tuple(sorted(visible))
 
 
-#: The seven modality configurations of the ablation grid, ordered light to
-#: heavy. Each is run twice: with and without the identity-reference branch.
+#: The two modality configurations studied in the report: audio-visual (VA)
+#: and audio-visual-text (VAT).
 MODALITY_CONFIGS: List[Tuple[str, List[str]]] = [
-    ("T", ["t"]), ("A", ["a"]), ("AT", ["a", "t"]),
-    ("V", ["v"]), ("VT", ["v", "t"]), ("VA", ["v", "a"]),
+    ("VA", ["v", "a"]),
     ("VAT", ["v", "a", "t"]),
 ]
 

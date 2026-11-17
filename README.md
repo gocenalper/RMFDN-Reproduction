@@ -90,8 +90,8 @@ The first command builds the CPU image (about five minutes). No dataset, GPU or
 model download is involved in any of the three.
 
 **What the smoke test proves.** It writes 48 synthetic clips in the IDForge
-directory layout, trains three cells for two optimizer steps each (all three
-modalities with the identity reference, video + audio, text only), saves
+directory layout, trains two cells for two optimizer steps each (video + audio + text
+with the identity reference, and video + audio without it), saves
 checkpoints, scores the test split, then reloads every checkpoint through the
 evaluation script and checks that the scores match. It uses small randomly
 initialised encoders so it finishes in about a minute; the numbers it prints are
@@ -121,13 +121,13 @@ python scripts/smoke_test.py
 ## Results
 
 <p align="center">
-  <img src="docs/results.svg" alt="Detection AUC per modality against the published numbers, and per-technique average precision of the full model" width="100%">
+  <img src="docs/results.svg" alt="Detection AUC against the published number, and per-technique average precision of the full model" width="100%">
 </p>
 
 All numbers below are test-set scores from the files in [`results/`](results),
 printed by `scripts/summarize_results.py`. Nothing in the tables is typed by hand.
 
-**Setting of these runs:** identity-disjoint split (fold 0: 34 train, 6
+**Setting of this run:** identity-disjoint split (fold 0: 34 train, 6
 validation and 14 test identities, [`protocol_p2/fold_F0.json`](protocol_p2/fold_F0.json)),
 identity reference off, 6,000 optimizer steps at effective batch 128 on one GPU,
 seed 0, best checkpoint chosen by validation AUC.
@@ -136,38 +136,24 @@ seed 0, best checkpoint chosen by validation AUC.
 
 | Modalities | Paper ACC | Paper AUC | This repo ACC | This repo AUC | Train time |
 |---|---:|---:|---:|---:|---:|
-| Video | 75.48 | 85.31 | 73.60 | 84.29 | 43 min |
-| Audio | 81.31 | 92.31 | 65.02 | 86.06 | 114 min |
-| Text | 67.94 | 74.19 | 63.45 | 66.86 | 6 min |
 | **Video + Audio + Text** | **92.90** | **98.40** | **87.16** | **96.52** | 328 min |
 
-Paper numbers are from Tables 2 and 3 of arXiv:2401.11764v3. **The two sides
-are not a like-for-like comparison**: the paper trains for 90,000 iterations on
-the official split with the identity reference, while these runs use 6,000
-steps, no reference and test identities that never appear in training. See
+Paper numbers are from Table 2 of arXiv:2401.11764v3. **The two sides are not
+a like-for-like comparison**: the paper trains for 90,000 iterations on the
+official split with the identity reference, while this run uses 6,000 steps,
+no reference and test identities that never appear in training. See
 [What differs from the paper](#what-differs-from-the-paper).
-
-What the comparison does show: the reimplementation reaches the published AUC
-regime with 1/15 of the training steps, the ordering of the modalities matches
-(full model > audio ≈ video > text), and fusing the three streams gains about
-10 AUC points over the best single stream, as in the paper.
 
 ### Technique attribution (average precision per technique)
 
 | Run | lip-sync | face-swap | TTS | voice conv. | audio shuffle | LLM text | text shuffle | mAP |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Video | 96.1 | 67.8 | – | – | – | – | – | 81.97 |
-| Audio | – | – | 100.0 | 99.9 | – | – | – | 99.97 |
-| Text | – | – | – | – | – | 91.6 | – | 91.60 |
 | **Video + Audio + Text** | 89.0 | 79.2 | 99.9 | 99.9 | 76.8 | 97.9 | 93.5 | **90.89** |
 
-A dash means the technique leaves no evidence in that stream (a voice clone
-cannot be seen in the frames), so the run is neither trained nor scored on it.
-For that reason the mAP column is not comparable across rows. The paper reports
-mAP 93.38 for the full model over all seven techniques.
+The paper reports mAP 93.38 for the full model over all seven techniques.
 
 Full metrics (CF1, OF1, per-technique accuracy, precision and recall) and the
-exact configuration of every run are in `results/fold0/<modality>/`.
+exact configuration of the run are in `results/fold0/VAT/`.
 
 ## Train on IDForge
 
@@ -208,7 +194,10 @@ On Windows PowerShell use `$env:IDFORGE_ROOT = "D:\idforge"` and so on. The
 It runs the recipe behind the results above; the full model needs about 24 GB
 of GPU memory at batch size 64.
 
-`experiments/experiment_matrix.json` declares 13 cells. To train only some,
+`experiments/experiment_matrix.json` declares the four runs used in the
+report: VA and VAT on the identity-disjoint split without the reference, VAT
+with the reference on the same split (identity-reference claim), and VA on the
+official split (baseline). To train only some,
 write a smaller config and point `RMFDN_CONFIG` at it:
 
 ```json
@@ -219,7 +208,7 @@ write a smaller config and point `RMFDN_CONFIG` at it:
 |---|---|
 | `identity` | `i1` identity reference on, `i3` reference off |
 | `protocol` | `p1` official IDForge split, `p2` identity-disjoint split (`--p2-split`) |
-| `modalities` | any of `V` `A` `T` `VA` `VT` `AT` `VAT` |
+| `modalities` | `VA` or `VAT` |
 
 A run is named `m1_<identity>_<protocol>_<modalities>`. Training is resumable:
 finished cells are skipped, and an interrupted cell continues from its last
@@ -244,8 +233,7 @@ python scripts/run_experiment_suite.py \
 |---|---|
 | `--iters` / `--lr-schedule-iters` | Steps to run / length of the cosine schedule. The paper uses 90,000 for both |
 | `--batch-size` × `--grad-accum-steps` | Effective batch size (64 × 2 = 128) at the memory cost of one micro-batch |
-| `--mask-invisible-bits` | Supervise each cell only on techniques its modalities can observe |
-| `--blank-modalities at` | Keep the full model but feed silence and an empty transcript (missing-modality tests) |
+| `--mask-invisible-bits` | Supervise the technique head only on techniques the cell's modalities can observe (VA: the two text techniques are left out; VAT: no effect) |
 | `--select-metric {AUC,ACC,mAP}` | Validation metric that picks the best checkpoint (default AUC) |
 | `--final-eval` | Also validate and save the weights of the last step |
 | `--seed` | Training seed (default 0) |

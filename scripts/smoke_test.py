@@ -50,7 +50,7 @@ IDENTITIES = tuple(i for ids in P2_ASSIGNMENT.values() for i in ids)
 #: Cells trained by the smoke test: identity x protocol x modalities.
 SMOKE_CELLS = [
     {"cross_modal": "m1", "identity": "i1", "protocol": "p1", "modalities": ["VAT"]},
-    {"cross_modal": "m1", "identity": "i3", "protocol": "p2", "modalities": ["VA", "T"]},
+    {"cross_modal": "m1", "identity": "i3", "protocol": "p2", "modalities": ["VA"]},
 ]
 
 WORDS = ("the", "speaker", "said", "that", "this", "is", "a", "test", "of",

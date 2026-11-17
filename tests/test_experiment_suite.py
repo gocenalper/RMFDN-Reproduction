@@ -24,10 +24,11 @@ def test_expand_cells_matches_declared_matrix():
     cells = json.load(open(Path(__file__).resolve().parents[1]
                            / "experiments" / "experiment_matrix.json"))["cells"]
     specs = expand_cells(cells)
-    # 7 + 1 + 1 + 4 = 13 runs total
-    assert len(specs) == 13
+    # 2 + 1 + 1 = 4 runs total
+    assert len(specs) == 4
     names = {s.name for s in specs}
-    assert "m1_i1_p1_V" in names and "m1_i1_p1_VAT" in names
+    assert "m1_i3_p2_VA" in names and "m1_i3_p1_VA" in names
+    assert "m1_i1_p2_VAT" in names
     assert "m1_i3_p2_VAT" in names
     assert len({s.protocol for s in specs}) == 2  # both p1 and p2 present
     for spec in specs:

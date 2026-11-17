@@ -22,7 +22,7 @@
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 set -euo pipefail
-: "${WORK:?set WORK to the working directory}" "${MOD:?set MOD to V, A, T, VA, VT, AT or VAT}"
+: "${WORK:?set WORK to the working directory}" "${MOD:?set MOD to VA or VAT}"
 IDENTITY=${IDENTITY:-i3}      # i1 = identity reference on, i3 = off
 PROTOCOL=${PROTOCOL:-p2}      # p1 = official split, p2 = identity-disjoint
 SEED=${SEED:-0}

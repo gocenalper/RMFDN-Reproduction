@@ -40,7 +40,7 @@ class ExperimentSpec:
     cross_modal: str   # 'm1'
     identity: str      # 'i1' | 'i3'
     protocol: str      # 'p1' | 'p2'
-    modality: str      # 'V' | 'A' | 'T' | 'VA' | 'VT' | 'AT' | 'VAT'
+    modality: str      # 'VA' | 'VAT'
 
     @property
     def name(self) -> str:

@@ -19,13 +19,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 #: Numbers published by Xu et al. (arXiv:2401.11764v3, Tables 2 and 3), in
 #: percent: official split, identity reference on, 90,000 iterations.
 PAPER = {
-    "V": {"ACC": 75.48, "AUC": 85.31},
-    "A": {"ACC": 81.31, "AUC": 92.31},
-    "T": {"ACC": 67.94, "AUC": 74.19},
+    "VA": {"ACC": 90.63, "AUC": 98.12, "mAP": 86.67},
     "VAT": {"ACC": 92.90, "AUC": 98.40, "mAP": 93.38},
 }
 
-MODALITY_ORDER = ("V", "A", "T", "VA", "VT", "AT", "VAT")
+MODALITY_ORDER = ("VA", "VAT")
 SHORT = {"lip_sync": "lip", "face_swap": "face", "tts": "tts", "rvc": "rvc",
          "audio_shuffle": "a-shuf", "llm_textgen": "llm", "text_shuffle": "t-shuf"}
 

@@ -1,25 +1,12 @@
 {
-  "description": "R-MFDN experiment matrix. Axes: protocol p1 (official IDForge split) / p2 (identity-disjoint); identity i1 (identity reference on) / i3 (reference off). cross_modal is always m1, the R-MFDN progressive cross-attention fusion. A run is named <cross_modal>_<identity>_<protocol>_<modalities>, e.g. m1_i1_p1_VAT.",
+  "description": "R-MFDN runs used in the report. Axes: protocol p1 (official IDForge split) / p2 (identity-disjoint); identity i1 (identity reference on) / i3 (reference off). cross_modal is always m1, the R-MFDN progressive cross-attention fusion. A run is named <cross_modal>_<identity>_<protocol>_<modalities>, e.g. m1_i3_p2_VAT. p2/i3 VA and VAT: reproduction (C1). p2/i1 VAT against p2/i3 VAT: identity-reference claim (C2). p1/i3 VA: official-split baseline, also the control of the improvement experiment.",
   "cells": [
     {
       "cross_modal": "m1",
-      "identity": "i1",
-      "protocol": "p1",
+      "identity": "i3",
+      "protocol": "p2",
       "modalities": [
-        "V",
-        "A",
-        "T",
         "VA",
-        "VT",
-        "AT",
-        "VAT"
-      ]
-    },
-    {
-      "cross_modal": "m1",
-      "identity": "i3",
-      "protocol": "p1",
-      "modalities": [
         "VAT"
       ]
     },
@@ -34,12 +21,9 @@
     {
       "cross_modal": "m1",
       "identity": "i3",
-      "protocol": "p2",
+      "protocol": "p1",
       "modalities": [
-        "V",
-        "A",
-        "T",
-        "VAT"
+        "VA"
       ]
     }
   ]

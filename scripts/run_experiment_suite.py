@@ -74,10 +74,6 @@ def main() -> None:
                              "for best-checkpoint selection) and save runs/<cell>_final.pt")
     parser.add_argument("--select-metric", choices=["ACC", "AUC", "mAP"], default=None,
                         help="validation metric for best-checkpoint/early-stop (default AUC)")
-    parser.add_argument("--blank-modalities", default=None,
-                        help="train/eval the unchanged (VAT) graph with these "
-                             "modalities' raw inputs blanked, e.g. 'at' -> "
-                             "black frames kept real, zero mel, empty text")
     parser.add_argument("--mask-invisible-bits", action="store_true",
                         help="supervise the technique BCE only on bits directly "
                              "perceivable by the cell's modalities (v: lip/face, "
@@ -126,11 +122,6 @@ def main() -> None:
         config["mask_invisible_bits"] = True
     if args.seed is not None:
         config["seed"] = args.seed
-    if args.blank_modalities is not None:
-        blank = set(args.blank_modalities.lower())
-        if not blank or not blank.issubset({"v", "a", "t"}):
-            parser.error("--blank-modalities must be a non-empty subset of 'vat'")
-        config["blank_modalities"] = "".join(sorted(blank))
     config["skip_test_eval"] = args.skip_test_eval
     if args.ast_checkpoint is not None:
         config["ast_checkpoint"] = args.ast_checkpoint
